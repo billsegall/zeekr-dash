@@ -1,3 +1,7 @@
+# Other repos
+zeekr_ev_api/
+zeekr_key_extractor/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
