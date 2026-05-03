@@ -7,6 +7,7 @@ plan
 zeekr_secrets.json
 zeekr_arm64.apk
 zeekr_base.apk
+.session.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

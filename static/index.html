@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeekr 7X</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #070c18;
+  --card: #0d1526;
+  --card2: #111d33;
+  --border: #1a2740;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a78bfa;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ---- Header ---- */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-title { font-size: 17px; font-weight: 600; letter-spacing: 0.3px; }
+.header-vin { font-size: 11px; color: var(--muted); font-family: monospace; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s infinite;
+}
+.status-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.header-right { display: flex; align-items: center; gap: 14px; }
+.last-updated { font-size: 11px; color: var(--muted); }
+.refresh-btn {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background .15s;
+}
+.refresh-btn:hover { background: var(--border); }
+.countdown { font-size: 11px; color: var(--muted); width: 24px; text-align: center; }
+
+/* ---- Grid ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 12px;
+  padding: 14px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.card-header .icon { font-size: 14px; }
+.card-body { padding: 14px; }
+
+/* ---- Spans ---- */
+.col-3  { grid-column: span 3; }
+.col-4  { grid-column: span 4; }
+.col-5  { grid-column: span 5; }
+.col-6  { grid-column: span 6; }
+.col-7  { grid-column: span 7; }
+.col-8  { grid-column: span 8; }
+.col-12 { grid-column: span 12; }
+
+@media (max-width: 1100px) {
+  .col-3,.col-4,.col-5,.col-6,.col-7,.col-8 { grid-column: span 6; }
+  .col-12 { grid-column: span 12; }
+}
+@media (max-width: 700px) {
+  .col-3,.col-4,.col-5,.col-6,.col-7,.col-8,.col-12 { grid-column: span 12; }
+  .grid { gap: 10px; padding: 10px; }
+}
+
+/* ---- Battery ---- */
+.battery-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+.battery-gauge {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+}
+.battery-gauge svg { width: 90px; height: 90px; transform: rotate(-90deg); }
+.battery-gauge .bg  { fill: none; stroke: var(--card2); stroke-width: 8; }
+.battery-gauge .bar { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+.battery-pct {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; font-family: monospace;
+  line-height: 1;
+}
+.battery-pct small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.battery-stats { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; }
+.stat-label { color: var(--muted); font-size: 12px; }
+.stat-val { font-family: monospace; font-weight: 600; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600;
+  background: rgba(100,116,139,.15);
+  color: var(--muted);
+}
+.badge.green { background: rgba(34,197,94,.12); color: var(--green); }
+.badge.amber { background: rgba(245,158,11,.12); color: var(--amber); }
+.badge.blue  { background: rgba(59,130,246,.12);  color: var(--blue); }
+.badge.red   { background: rgba(239,68,68,.12);   color: var(--red); }
+
+/* ---- Map ---- */
+#map { height: 280px; border-radius: 0 0 10px 10px; }
+.leaflet-container { background: #0a111f; }
+
+/* ---- Doors ---- */
+.door-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.door-item {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.door-item.open { border-color: rgba(239,68,68,.4); background: rgba(239,68,68,.05); }
+.door-item.unlocked { border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.04); }
+.door-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.door-state { font-size: 12px; font-weight: 600; }
+.door-icon { font-size: 18px; }
+
+/* ---- Climate ---- */
+.temp-big {
+  font-size: 42px;
+  font-weight: 700;
+  font-family: monospace;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.temp-unit { font-size: 20px; color: var(--muted); }
+.climate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+.climate-item {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 8px;
+  text-align: center;
+}
+.climate-item .ci-label { font-size: 10px; color: var(--muted); }
+.climate-item .ci-val { font-size: 12px; font-weight: 600; margin-top: 2px; }
+.climate-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* ---- Charging ---- */
+.charge-schedule {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.charge-live {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.charge-live-item {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.charge-live-item .cl-label { font-size: 10px; color: var(--muted); }
+.charge-live-item .cl-val { font-size: 16px; font-weight: 700; font-family: monospace; margin-top: 2px; }
+
+/* ---- Maintenance ---- */
+.tyre-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tyre-item {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.tyre-item .t-label { font-size: 10px; color: var(--muted); }
+.tyre-item .t-val { font-size: 13px; font-weight: 600; font-family: monospace; margin-top: 1px; }
+.tyre-item.warn { border-color: rgba(245,158,11,.4); }
+.maint-stats { display: flex; flex-direction: column; gap: 8px; }
+.service-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.service-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--green);
+  transition: width .6s;
+}
+
+/* ---- Modes ---- */
+.modes-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mode-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+.mode-pill.active { background: rgba(34,197,94,.07); border-color: rgba(34,197,94,.3); color: var(--green); }
+.mode-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.mode-pill.active .mode-dot { background: var(--green); box-shadow: 0 0 4px var(--green); }
+
+/* ---- Trips ---- */
+.trips-table { width: 100%; border-collapse: collapse; }
+.trips-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+.trips-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(26,39,64,.5);
+  font-size: 13px;
+}
+.trips-table tr:last-child td { border-bottom: none; }
+.trips-table tr.trip-row { cursor: pointer; transition: background .12s; }
+.trips-table tr.trip-row:hover { background: var(--card2); }
+.trips-table tr.trip-row.active { background: rgba(59,130,246,.07); }
+.energy-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.energy-track {
+  flex: 1;
+  max-width: 80px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.energy-fill { height: 100%; border-radius: 2px; background: var(--blue); }
+.regen-fill { background: var(--green); }
+.mono { font-family: monospace; }
+
+/* ---- Divider ---- */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+/* ---- Loading ---- */
+.skeleton {
+  background: linear-gradient(90deg, var(--card2) 25%, var(--border) 50%, var(--card2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  height: 14px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+.loading-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(7,12,24,.7);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  z-index: 10;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="status-dot" id="statusDot"></div>
+    <div>
+      <div class="header-title">Zeekr 7X</div>
+      <div class="header-vin" id="headerVin">—</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-updated" id="lastUpdated">—</span>
+    <span class="countdown" id="countdown"></span>
+    <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Battery -->
+  <div class="card col-4" id="cardBattery">
+    <div class="card-header"><span class="icon">⚡</span> Battery</div>
+    <div class="card-body">
+      <div class="battery-main">
+        <div class="battery-gauge">
+          <svg viewBox="0 0 36 36">
+            <circle class="bg"  cx="18" cy="18" r="14"/>
+            <circle class="bar" cx="18" cy="18" r="14" id="batteryArc"
+              stroke="#22c55e"
+              stroke-dasharray="87.96 87.96"
+              stroke-dashoffset="87.96"/>
+          </svg>
+          <div class="battery-pct">
+            <span id="battPct">—</span>
+            <small>%</small>
+          </div>
+        </div>
+        <div class="battery-stats">
+          <div class="stat-row">
+            <span class="stat-label">Range</span>
+            <span class="stat-val" id="battRange">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Plug</span>
+            <span id="battPlug">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">State</span>
+            <span id="battState">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Target</span>
+            <span class="stat-val" id="battTarget">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">12V</span>
+            <span class="stat-val" id="batt12v">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="card col-8" id="cardMap">
+    <div class="card-header">
+      <span class="icon">📍</span> Location
+      <span style="margin-left:auto;font-size:10px" id="mapCoords">—</span>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Doors -->
+  <div class="card col-4" id="cardDoors">
+    <div class="card-header"><span class="icon">🚪</span> Doors &amp; Security</div>
+    <div class="card-body">
+      <div class="door-grid" id="doorGrid">
+        <!-- filled by JS -->
+      </div>
+      <hr class="divider">
+      <div class="stat-row">
+        <span class="stat-label">Central lock</span>
+        <span id="centralLock">—</span>
+      </div>
+      <div class="stat-row" style="margin-top:6px">
+        <span class="stat-label">Park brake</span>
+        <span id="parkBrake">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Climate -->
+  <div class="card col-4" id="cardClimate">
+    <div class="card-header"><span class="icon">🌡</span> Climate</div>
+    <div class="card-body">
+      <div class="temp-big" id="interiorTemp">—<span class="temp-unit">°C</span></div>
+      <div style="margin-top:4px">
+        <span id="preClimate">—</span>
+      </div>
+      <div class="climate-grid" id="windowGrid">
+        <!-- filled by JS -->
+      </div>
+      <hr class="divider">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">SEAT HEATING / VENT</div>
+      <div id="seatGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Charging -->
+  <div class="card col-4" id="cardCharging">
+    <div class="card-header"><span class="icon">🔌</span> Charging</div>
+    <div class="card-body">
+      <div class="stat-row">
+        <span class="stat-label">AC port</span>
+        <span id="lidAc">—</span>
+      </div>
+      <div class="stat-row" style="margin-top:6px">
+        <span class="stat-label">DC port</span>
+        <span id="lidDc">—</span>
+      </div>
+      <div class="charge-live" id="chargeLive">
+        <div class="charge-live-item">
+          <div class="cl-label">POWER</div>
+          <div class="cl-val" id="chargePower">—</div>
+        </div>
+        <div class="charge-live-item">
+          <div class="cl-label">CURRENT</div>
+          <div class="cl-val" id="chargeCurrent">—</div>
+        </div>
+        <div class="charge-live-item">
+          <div class="cl-label">VOLTAGE</div>
+          <div class="cl-val" id="chargeVoltage">—</div>
+        </div>
+        <div class="charge-live-item">
+          <div class="cl-label">SPEED</div>
+          <div class="cl-val" id="chargeSpeed">—</div>
+        </div>
+      </div>
+      <div class="charge-schedule" id="chargePlan">
+        <div>
+          <div style="font-size:11px;color:var(--muted)">SCHEDULE</div>
+          <div style="font-family:monospace;font-weight:600;font-size:15px" id="planTime">—</div>
+        </div>
+        <span id="planActive">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Maintenance -->
+  <div class="card col-6" id="cardMaintenance">
+    <div class="card-header"><span class="icon">🔧</span> Maintenance</div>
+    <div class="card-body">
+      <div class="maint-stats">
+        <div class="stat-row">
+          <span class="stat-label">Odometer</span>
+          <span class="stat-val mono" id="odometer">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Service due</span>
+          <span class="stat-val" id="serviceDue">—</span>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">DISTANCE TO SERVICE</div>
+          <div class="service-bar">
+            <div class="service-bar-fill" id="serviceBar" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Brake fluid</span>
+          <span id="brakeFluid">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Coolant</span>
+          <span id="coolantLevel">—</span>
+        </div>
+      </div>
+      <div class="tyre-grid">
+        <div class="tyre-item" id="tyreFL">
+          <div class="t-label">FL</div>
+          <div class="t-val">—</div>
+        </div>
+        <div class="tyre-item" id="tyreFR">
+          <div class="t-label">FR</div>
+          <div class="t-val">—</div>
+        </div>
+        <div class="tyre-item" id="tyreRL">
+          <div class="t-label">RL</div>
+          <div class="t-val">—</div>
+        </div>
+        <div class="tyre-item" id="tyreRR">
+          <div class="t-label">RR</div>
+          <div class="t-val">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modes -->
+  <div class="card col-6" id="cardModes">
+    <div class="card-header"><span class="icon">⚙️</span> Modes</div>
+    <div class="card-body">
+      <div class="modes-grid" id="modesGrid">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Trips -->
+  <div class="card col-12" id="cardTrips">
+    <div class="card-header">
+      <span class="icon">🗺</span> Trips
+      <span style="margin-left:auto;color:var(--muted)" id="tripsTotal">—</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="trips-table">
+        <thead>
+          <tr>
+            <th>Date / Time</th>
+            <th>Distance</th>
+            <th>Avg speed</th>
+            <th>Consumed</th>
+            <th>Regen</th>
+            <th>Energy balance</th>
+          </tr>
+        </thead>
+        <tbody id="tripsBody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)">
+      <button class="refresh-btn" id="tripsPrev" onclick="tripsChangePage(-1)">← Prev</button>
+      <span id="tripsPageInfo" style="font-size:12px;color:var(--muted)">—</span>
+      <button class="refresh-btn" id="tripsNext" onclick="tripsChangePage(1)">Next →</button>
+    </div>
+  </div>
+
+</div><!-- /grid -->
+
+<script>
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+const REFRESH_MS = 30000;
+let countdown = REFRESH_MS / 1000;
+let timer = null;
+let map, carMarker, tripLayers = [];
+let tripsPage = 1;
+const TRIPS_PAGE_SIZE = 20;
+
+// ---------------------------------------------------------------------------
+// Map init
+// ---------------------------------------------------------------------------
+function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: false })
+    .setView([-27.48, 152.99], 14);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  const carIcon = L.divIcon({
+    html: `<div style="
+      width:28px;height:28px;background:#22c55e;border-radius:50%;
+      border:2px solid #fff;display:flex;align-items:center;justify-content:center;
+      font-size:14px;box-shadow:0 0 10px rgba(34,197,94,.5)">🚗</div>`,
+    className: '', iconAnchor: [14, 14]
+  });
+  carMarker = L.marker([0, 0], { icon: carIcon });
+}
+
+function updateMapPosition(lat, lng) {
+  if (!lat || !lng) return;
+  const ll = [parseFloat(lat), parseFloat(lng)];
+  carMarker.setLatLng(ll).addTo(map);
+  map.setView(ll);
+  document.getElementById('mapCoords').textContent =
+    `${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`;
+}
+
+function showTripOnMap(trackPoints) {
+  tripLayers.forEach(l => map.removeLayer(l));
+  tripLayers = [];
+  if (!trackPoints || !trackPoints.length) return;
+
+  const pts = trackPoints.map(p => [p.latitude, p.longitude]);
+  const line = L.polyline(pts, { color: '#3b82f6', weight: 3, opacity: .8 }).addTo(map);
+
+  const startIcon = L.divIcon({
+    html: `<div style="width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff"></div>`,
+    className: '', iconAnchor: [5, 5]
+  });
+  const endIcon = L.divIcon({
+    html: `<div style="width:10px;height:10px;background:#ef4444;border-radius:50%;border:2px solid #fff"></div>`,
+    className: '', iconAnchor: [5, 5]
+  });
+
+  const start = L.marker(pts[0], { icon: startIcon }).addTo(map);
+  const end   = L.marker(pts[pts.length - 1], { icon: endIcon }).addTo(map);
+
+  tripLayers = [line, start, end];
+  map.fitBounds(line.getBounds(), { padding: [30, 30] });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function fmt(v, unit='', dec=1) {
+  const n = parseFloat(v);
+  return isNaN(n) ? '—' : n.toFixed(dec) + (unit ? ' ' + unit : '');
+}
+
+function fmtTs(ms) {
+  const d = new Date(ms);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return isToday ? 'Today ' + time : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
+}
+
+function badge(text, color='') {
+  return `<span class="badge ${color}">${text}</span>`;
+}
+
+// status codes — best-effort interpretation, raw value shown if uncertain
+function doorLock(v)   { return v === '1' ? badge('Locked', 'green') : badge('Unlocked', 'red'); }
+function doorOpen(v)   { return v === '0' ? badge('Closed') : badge('Open', 'red'); }
+function lidStatus(v)  { return v === '2' ? badge('Closed') : v === '1' ? badge('Open', 'amber') : badge(`raw:${v}`); }
+function fluidLevel(v) { return v === '3' ? badge('OK', 'green') : v === '2' ? badge('Low', 'amber') : v === '1' ? badge('Critical', 'red') : badge(`raw:${v}`); }
+function winState(v, pos) {
+  if (v === '2') return badge('Closed');
+  if (v === '0') return badge(`Open ${pos}%`, 'amber');
+  return badge(`raw:${v}`, '');
+}
+function seatHeat(v, label) {
+  const lvl = parseInt(v);
+  const color = lvl > 0 ? 'amber' : '';
+  const txt = lvl === 0 ? 'Off' : `Lv ${lvl}`;
+  return `<span class="badge ${color}">${label} ${txt}</span>`;
+}
+
+// ---------------------------------------------------------------------------
+// Renderers
+// ---------------------------------------------------------------------------
+function renderBattery(ev, maint, chargingLimit) {
+  const pct = parseFloat(ev.chargeLevel) || 0;
+  const range = parseInt(ev.distanceToEmptyOnBatteryOnly) || 0;
+
+  document.getElementById('battPct').textContent = pct.toFixed(0);
+  document.getElementById('battRange').textContent = range + ' km';
+  document.getElementById('battPlug').innerHTML =
+    ev.isPluggedIn ? badge('Plugged in', 'blue') : badge('Unplugged');
+  document.getElementById('battState').innerHTML =
+    ev.isCharging ? badge('Charging', 'blue') : badge('Idle');
+
+  // target SoC: "852" → 85.2%  (unconfirmed — shown with note)
+  const socRaw = parseInt(chargingLimit?.soc);
+  const socPct = !isNaN(socRaw) && socRaw > 100 ? (socRaw / 10).toFixed(1) + '%' : socRaw + '%';
+  document.getElementById('battTarget').textContent = socPct + ' limit';
+
+  const volt12 = maint?.mainBatteryStatus?.voltage;
+  document.getElementById('batt12v').textContent = volt12 ? volt12.toFixed(2) + ' V' : '—';
+
+  // arc: circumference of r=14 circle = 2π×14 ≈ 87.96
+  const circ = 87.96;
+  const offset = circ - (pct / 100) * circ;
+  const arc = document.getElementById('batteryArc');
+  arc.style.strokeDashoffset = offset;
+  arc.style.stroke = pct < 20 ? '#ef4444' : pct < 40 ? '#f59e0b' : '#22c55e';
+}
+
+function renderClimate(c) {
+  const temp = parseFloat(c.interiorTemp);
+  document.getElementById('interiorTemp').innerHTML =
+    (isNaN(temp) ? '—' : temp.toFixed(1)) + '<span class="temp-unit">°C</span>';
+
+  document.getElementById('preClimate').innerHTML =
+    c.preClimateActive ? badge('Pre-climate active', 'blue') : badge('Climate off');
+
+  const windows = [
+    { id: 'winFL', label: 'FL', status: c.winStatusDriver,         pos: c.winPosDriver },
+    { id: 'winFR', label: 'FR', status: c.winStatusPassenger,      pos: c.winPosPassenger },
+    { id: 'winRL', label: 'RL', status: c.winStatusDriverRear,     pos: c.winPosDriverRear },
+    { id: 'winRR', label: 'RR', status: c.winStatusPassengerRear,  pos: c.winPosPassengerRear },
+  ];
+  document.getElementById('windowGrid').innerHTML = windows.map(w => `
+    <div class="climate-item">
+      <div class="ci-label">${w.label}</div>
+      <div class="ci-val">${winState(w.status, w.pos)}</div>
+    </div>
+  `).join('') + `
+    <div class="climate-item" style="grid-column:span 2">
+      <div class="ci-label">Sunroof</div>
+      <div class="ci-val">${c.sunroofOpenStatus === '1' ? badge('Open', 'amber') : badge('Closed')}</div>
+    </div>
+    <div class="climate-item" style="grid-column:span 2">
+      <div class="ci-label">Steering heat</div>
+      <div class="ci-val">${c.steerWhlHeatingSts === '2' ? badge('Off') : badge('On', 'amber')}</div>
+    </div>
+  `;
+
+  const seats = [
+    { label: 'FL', heat: c.drvHeatSts,   vent: c.drvVentSts },
+    { label: 'FR', heat: c.passHeatingSts, vent: c.passVentSts },
+    { label: 'RL', heat: c.rlHeatingSts,  vent: c.rlVentSts },
+    { label: 'RR', heat: c.rrHeatingSts,  vent: c.rrVentSts },
+  ];
+  document.getElementById('seatGrid').innerHTML = seats.map(s => {
+    const heat = parseInt(s.heat);
+    const vent = parseInt(s.vent);
+    const heatColor = heat > 0 ? 'var(--amber)' : 'var(--muted)';
+    const ventColor = vent > 0 ? 'var(--blue)'  : 'var(--muted)';
+    return `<div class="climate-item">
+      <div class="ci-label">${s.label}</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">
+        <span style="font-size:13px;color:${heatColor}" title="Heat lv ${heat}">🔥${heat > 0 ? heat : ''}</span>
+        <span style="font-size:13px;color:${ventColor}" title="Vent lv ${vent}">💨${vent > 0 ? vent : ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDoors(d) {
+  const doors = [
+    { label: 'Front Left',  open: d.doorOpenStatusDriver,        lock: d.doorLockStatusDriver },
+    { label: 'Front Right', open: d.doorOpenStatusPassenger,     lock: d.doorLockStatusPassenger },
+    { label: 'Rear Left',   open: d.doorOpenStatusDriverRear,    lock: d.doorLockStatusDriverRear },
+    { label: 'Rear Right',  open: d.doorOpenStatusPassengerRear, lock: d.doorLockStatusPassengerRear },
+    { label: 'Boot',        open: d.trunkOpenStatus,             lock: d.trunkLockStatus },
+    { label: 'Hood',        open: d.engineHoodOpenStatus,        lock: null },
+  ];
+  document.getElementById('doorGrid').innerHTML = doors.map(door => {
+    const isOpen = door.open !== '0';
+    const isUnlocked = door.lock !== null && door.lock !== '1';
+    const cls = isOpen ? 'open' : isUnlocked ? 'unlocked' : '';
+    const icon = isOpen ? '🔓' : isUnlocked ? '🔓' : '🔒';
+    return `<div class="door-item ${cls}">
+      <span style="font-size:16px">${icon}</span>
+      <div>
+        <div class="door-label">${door.label}</div>
+        <div class="door-state">${isOpen ? '<span style="color:var(--red)">Open</span>' : 'Closed'}
+          ${door.lock !== null ? (isUnlocked ? ' · <span style="color:var(--amber)">Unlocked</span>' : ' · Locked') : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('centralLock').innerHTML = doorLock(d.centralLockingStatus);
+  document.getElementById('parkBrake').innerHTML =
+    d.electricParkBrakeStatus === '1' ? badge('Engaged', 'green') : badge('Released', 'amber');
+}
+
+function renderCharging(chStatus, chLimit, chPlan, ev) {
+  document.getElementById('lidAc').innerHTML = lidStatus(ev.chargeLidAcStatus);
+  document.getElementById('lidDc').innerHTML = lidStatus(ev.chargeLidDcAcStatus);
+
+  document.getElementById('chargePower').textContent =
+    parseFloat(chStatus.chargePower) > 0 ? fmt(chStatus.chargePower, 'kW') : '—';
+  document.getElementById('chargeCurrent').textContent =
+    parseFloat(chStatus.chargeCurrent) > 0 ? fmt(chStatus.chargeCurrent, 'A') : '—';
+  document.getElementById('chargeVoltage').textContent =
+    parseFloat(chStatus.chargeVoltage) > 0 ? fmt(chStatus.chargeVoltage, 'V') : '—';
+  document.getElementById('chargeSpeed').textContent =
+    parseInt(chStatus.chargeSpeed) > 0 ? chStatus.chargeSpeed + ' kW' : '—';
+
+  if (chPlan) {
+    document.getElementById('planTime').textContent =
+      (chPlan.startTime || '—') + ' → ' + (chPlan.endTime || '—');
+    document.getElementById('planActive').innerHTML =
+      chPlan.command === 'start' ? badge('Active', 'green') : badge('Inactive');
+  }
+}
+
+function renderMaintenance(m) {
+  document.getElementById('odometer').textContent =
+    m.odometer ? m.odometer.toLocaleString() + ' km' : '—';
+
+  const distKm = m.distanceToService;
+  const days   = m.daysToService;
+  document.getElementById('serviceDue').textContent =
+    (distKm ? distKm.toLocaleString() + ' km' : '—') + ' / ' + (days ? days + ' d' : '—');
+
+  // assume 15,000km service interval; show how much is used
+  const pct = Math.min(100, Math.max(0, 100 - (distKm / 15000) * 100));
+  document.getElementById('serviceBar').style.width = (100 - pct) + '%';
+  document.getElementById('serviceBar').style.background =
+    pct > 80 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#22c55e';
+
+  document.getElementById('brakeFluid').innerHTML  = fluidLevel(m.brakeFluidLevelStatus);
+  document.getElementById('coolantLevel').innerHTML = fluidLevel(m.engineCoolantLevelStatus);
+
+  const tyres = [
+    { id: 'tyreFL', label: 'FL', kpa: m.tyreStatusDriver,         temp: m.tyreTempDriver,         warn: m.tyrePreWarningDriver },
+    { id: 'tyreFR', label: 'FR', kpa: m.tyreStatusPassenger,      temp: m.tyreTempPassenger,      warn: m.tyrePreWarningPassenger },
+    { id: 'tyreRL', label: 'RL', kpa: m.tyreStatusDriverRear,     temp: m.tyreTempDriverRear,     warn: m.tyrePreWarningDriverRear },
+    { id: 'tyreRR', label: 'RR', kpa: m.tyreStatusPassengerRear,  temp: m.tyreTempPassengerRear,  warn: m.tyrePreWarningPassengerRear },
+  ];
+  tyres.forEach(t => {
+    const el = document.getElementById(t.id);
+    const warn = t.warn > 0;
+    el.className = 'tyre-item' + (warn ? ' warn' : '');
+    el.querySelector('.t-label').textContent = t.label;
+    el.querySelector('.t-val').innerHTML =
+      `<span style="color:${warn ? 'var(--amber)' : 'inherit'}">${t.kpa} kPa</span>` +
+      `<span style="font-size:10px;color:var(--muted);margin-left:4px">${t.temp}°C</span>`;
+  });
+}
+
+function renderModes(m) {
+  const modes = [
+    { key: 'gpsstate',           label: 'GPS Tracking',      active: m.gpsstate === '1' },
+    { key: 'journalLogState',    label: 'Journey Logging',   active: m.journalLogState === '1' },
+    { key: 'parkingComfortState',label: 'Parking Comfort',   active: m.parkingComfortState === '1' },
+    { key: 'campingModeState',   label: 'Camp Mode',         active: m.campingModeState === '1' },
+    { key: 'overheatState',      label: 'Overheat Guard',    active: m.overheatState === '1' },
+    { key: 'washCarModeState',   label: 'Car Wash Mode',     active: m.washCarModeState === '1' },
+    { key: 'panicState',         label: 'Panic Alarm',       active: m.panicState === '1' },
+    { key: 'visitorModeState',   label: 'Visitor Mode',      active: m.visitorModeState === '1' },
+    { key: 'privacyMode',        label: `Privacy (raw:${m.privacyMode})`, active: m.privacyMode !== '0' },
+    { key: 'liveDetectionState', label: `Live Detect (raw:${m.liveDetectionState})`, active: m.liveDetectionState !== '0' },
+  ];
+  document.getElementById('modesGrid').innerHTML = modes.map(mode => `
+    <div class="mode-pill ${mode.active ? 'active' : ''}">
+      <div class="mode-dot"></div>
+      ${mode.label}
+    </div>
+  `).join('');
+}
+
+function renderTrips(data) {
+  const total = data.total || 0;
+  const pages = data.pages || 1;
+  document.getElementById('tripsTotal').textContent =
+    total ? `${total} trips · page ${tripsPage} of ${pages}` : '';
+  document.getElementById('tripsPageInfo').textContent = `Page ${tripsPage} of ${pages}`;
+  document.getElementById('tripsPrev').disabled = tripsPage <= 1;
+  document.getElementById('tripsNext').disabled = tripsPage >= pages;
+
+  const maxConsumption = Math.max(...(data.data || []).map(t => t.electricConsumption || 0), 1);
+  const maxRegen       = Math.max(...(data.data || []).map(t => t.electricRegeneration || 0), 1);
+
+  document.getElementById('tripsBody').innerHTML = (data.data || []).map((trip, i) => {
+    const consumePct = ((trip.electricConsumption || 0) / maxConsumption * 100).toFixed(0);
+    const regenPct   = ((trip.electricRegeneration || 0) / maxRegen * 100).toFixed(0);
+    return `<tr class="trip-row" data-idx="${i}" onclick="selectTrip(this, ${i})">
+      <td>${fmtTs(trip.reportTime)}</td>
+      <td class="mono">${trip.traveledDistance} km</td>
+      <td class="mono">${trip.avgSpeed} km/h</td>
+      <td class="mono">${trip.electricConsumption} Wh/km</td>
+      <td class="mono">${trip.electricRegeneration} Wh</td>
+      <td>
+        <div class="energy-bar">
+          <div class="energy-track"><div class="energy-fill" style="width:${consumePct}%"></div></div>
+          <span style="font-size:10px;color:var(--muted)">↓</span>
+          <div class="energy-track"><div class="energy-fill regen-fill" style="width:${regenPct}%"></div></div>
+          <span style="font-size:10px;color:var(--muted)">↑</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  window._tripsData = data.data || [];
+}
+
+async function tripsChangePage(delta) {
+  tripsPage += delta;
+  const res = await fetch(`/api/trips?page=${tripsPage}&size=${TRIPS_PAGE_SIZE}&days=365`);
+  const data = await res.json();
+  renderTrips(data);
+}
+
+function selectTrip(row, idx) {
+  document.querySelectorAll('.trip-row').forEach(r => r.classList.remove('active'));
+  row.classList.add('active');
+  const trip = window._tripsData[idx];
+  if (trip?.trackPoints?.length) {
+    showTripOnMap(trip.trackPoints);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Data fetch
+// ---------------------------------------------------------------------------
+async function fetchAll() {
+  const [allRes, tripsRes] = await Promise.all([
+    fetch('/api/all'),
+    fetch(`/api/trips?page=${tripsPage}&size=${TRIPS_PAGE_SIZE}&days=365`),
+  ]);
+  if (!allRes.ok || !tripsRes.ok) throw new Error('API error');
+  return {
+    all:   await allRes.json(),
+    trips: await tripsRes.json(),
+  };
+}
+
+async function refresh() {
+  const dot = document.getElementById('statusDot');
+  try {
+    const { all, trips } = await fetchAll();
+
+    const ev     = all.status.additionalVehicleStatus.electricVehicleStatus;
+    const safety = all.status.additionalVehicleStatus.drivingSafetyStatus;
+    const maint  = all.status.additionalVehicleStatus.maintenanceStatus;
+    const climat = all.status.additionalVehicleStatus.climateStatus;
+    const pos    = all.status.basicVehicleStatus.position;
+
+    renderBattery(ev, maint, all.charging.limit);
+    renderClimate(climat);
+    renderDoors(safety);
+    renderCharging(all.charging.status, all.charging.limit, all.charging.plan, ev);
+    renderMaintenance(maint);
+    renderModes(all.modes);
+    renderTrips(trips);
+    updateMapPosition(pos.latitude, pos.longitude);
+
+    document.getElementById('headerVin').textContent = all.vin;
+    document.getElementById('lastUpdated').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+    dot.className = 'status-dot';
+  } catch (e) {
+    console.error(e);
+    dot.className = 'status-dot error';
+    document.getElementById('lastUpdated').textContent = 'Error: ' + e.message;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-refresh countdown
+// ---------------------------------------------------------------------------
+function startCountdown() {
+  countdown = REFRESH_MS / 1000;
+  clearInterval(timer);
+  timer = setInterval(() => {
+    countdown--;
+    document.getElementById('countdown').textContent = countdown + 's';
+    if (countdown <= 0) {
+      clearInterval(timer);
+      refresh().then(startCountdown);
+    }
+  }, 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+initMap();
+refresh().then(startCountdown);
+</script>
+</body>
+</html>
