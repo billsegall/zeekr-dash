@@ -2,6 +2,10 @@
 zeekr_ev_api/
 zeekr_key_extractor/
 
+# Project files
+plan
+zeekr_secrets.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
