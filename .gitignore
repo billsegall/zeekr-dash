@@ -5,6 +5,8 @@ zeekr_key_extractor/
 # Project files
 plan
 zeekr_secrets.json
+zeekr_arm64.apk
+zeekr_base.apk
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -40,7 +42,7 @@ MANIFEST
 *.manifest
 *.spec
 
-# Installer logs
+  Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
 
