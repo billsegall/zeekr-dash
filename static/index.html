@@ -603,6 +603,7 @@ let timer = null;
 let map, carMarker, tripLayers = [];
 let tripsPage = 1;
 const TRIPS_PAGE_SIZE = 20;
+let tripsEndTimeStack = [0]; // endTime to fetch each page; 0 = now (first page)
 
 // ---------------------------------------------------------------------------
 // Map init
@@ -916,11 +917,17 @@ function renderTrips(data) {
   }).join('');
 
   window._tripsData = data.data || [];
+  window._tripsNextEndTime = (data.lastId || 1) - 1;
 }
 
 async function tripsChangePage(delta) {
-  tripsPage += delta;
-  const res = await fetch(`/api/trips?page=${tripsPage}&size=${TRIPS_PAGE_SIZE}&days=365`);
+  const newPage = tripsPage + delta;
+  if (delta > 0 && tripsEndTimeStack.length <= newPage - 1) {
+    tripsEndTimeStack.push(window._tripsNextEndTime ?? 0);
+  }
+  tripsPage = newPage;
+  const endTime = tripsEndTimeStack[tripsPage - 1] ?? 0;
+  const res = await fetch(`/api/trips?size=${TRIPS_PAGE_SIZE}&days=365&end_time=${endTime}`);
   const data = await res.json();
   renderTrips(data);
 }
@@ -940,7 +947,7 @@ function selectTrip(row, idx) {
 async function fetchAll() {
   const [allRes, tripsRes] = await Promise.all([
     fetch('/api/all'),
-    fetch(`/api/trips?page=${tripsPage}&size=${TRIPS_PAGE_SIZE}&days=365`),
+    fetch(`/api/trips?size=${TRIPS_PAGE_SIZE}&days=365`),
   ]);
   if (!allRes.ok || !tripsRes.ok) throw new Error('API error');
   return {

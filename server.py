@@ -139,8 +139,8 @@ def fetch_travel_plan():
 
 
 @ttl_cache(300)
-def fetch_trips(page: int, size: int, days: int):
-    return client.get_journey_log(VIN, page_size=size, current_page=page, days_back=days)
+def fetch_trips(size: int, days: int, end_time: int = 0):
+    return client.get_journey_log(VIN, page_size=size, days_back=days, end_time=end_time)
 
 
 # ---------------------------------------------------------------------------
@@ -203,11 +203,11 @@ def route_travel():
 
 @app.get("/api/trips")
 def route_trips():
-    page = request.args.get("page", 1, type=int)
     size = request.args.get("size", 20, type=int)
     days = request.args.get("days", 30, type=int)
+    end_time = request.args.get("end_time", 0, type=int)
     try:
-        return jsonify(fetch_trips(page, size, days))
+        return jsonify(fetch_trips(size, days, end_time))
     except (AuthException, ZeekrException) as e:
         return api_error(str(e))
 
