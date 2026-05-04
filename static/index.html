@@ -68,7 +68,6 @@ header {
   transition: background .15s;
 }
 .refresh-btn:hover { background: var(--border); }
-.countdown { font-size: 11px; color: var(--muted); width: 24px; text-align: center; }
 
 /* ---- Grid ---- */
 .grid {
@@ -366,7 +365,6 @@ header {
   </div>
   <div class="header-right">
     <span class="last-updated" id="lastUpdated">—</span>
-    <span class="countdown" id="countdown"></span>
     <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
   </div>
 </header>
@@ -588,6 +586,7 @@ header {
       <button class="refresh-btn" id="tripsPrev" onclick="tripsChangePage(-1)">← Prev</button>
       <span id="tripsPageInfo" style="font-size:12px;color:var(--muted)">—</span>
       <button class="refresh-btn" id="tripsNext" onclick="tripsChangePage(1)">Next →</button>
+      <button class="refresh-btn" onclick="downloadTripsCSV()" style="margin-left:auto">⬇ CSV</button>
     </div>
   </div>
 
@@ -597,9 +596,6 @@ header {
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const REFRESH_MS = 30000;
-let countdown = REFRESH_MS / 1000;
-let timer = null;
 let map, carMarker, tripLayers = [];
 let tripsPage = 1;
 const TRIPS_PAGE_SIZE = 20;
@@ -932,6 +928,43 @@ async function tripsChangePage(delta) {
   renderTrips(data);
 }
 
+async function downloadTripsCSV() {
+  const btn = document.querySelector('button[onclick="downloadTripsCSV()"]');
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading…';
+  try {
+    const allTrips = [];
+    let endTime = 0;
+    while (true) {
+      const res = await fetch(`/api/trips?size=100&days=365&end_time=${endTime}`);
+      const data = await res.json();
+      const page = data.data || [];
+      if (!page.length) break;
+      allTrips.push(...page);
+      if (allTrips.length >= (data.total || 0)) break;
+      endTime = (data.lastId || 1) - 1;
+    }
+    const headers = ['date','startTime','endTime','distanceKm','avgSpeedKmh','consumedWhPerKm','regenWh'];
+    const rows = allTrips.map(t => [
+      new Date(t.reportTime).toISOString(),
+      new Date(t.startTime).toISOString(),
+      new Date(t.endTime).toISOString(),
+      t.traveledDistance,
+      t.avgSpeed,
+      t.electricConsumption,
+      t.electricRegeneration,
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = `zeekr-trips-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ CSV';
+  }
+}
+
 function selectTrip(row, idx) {
   document.querySelectorAll('.trip-row').forEach(r => r.classList.remove('active'));
   row.classList.add('active');
@@ -988,26 +1021,10 @@ async function refresh() {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-refresh countdown
-// ---------------------------------------------------------------------------
-function startCountdown() {
-  countdown = REFRESH_MS / 1000;
-  clearInterval(timer);
-  timer = setInterval(() => {
-    countdown--;
-    document.getElementById('countdown').textContent = countdown + 's';
-    if (countdown <= 0) {
-      clearInterval(timer);
-      refresh().then(startCountdown);
-    }
-  }, 1000);
-}
-
-// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 initMap();
-refresh().then(startCountdown);
+refresh();
 </script>
 </body>
 </html>
