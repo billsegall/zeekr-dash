@@ -916,44 +916,44 @@ function renderDoors(d) {
   document.getElementById('doorDiagram').innerHTML = `
   <div style="position:relative;display:block">
     <img src="/7x_green.png" style="width:100%;display:block;opacity:0.92"/>
-    <svg viewBox="0 0 583 1136" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible">
+    <svg viewBox="0 0 496 1072" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible">
       <!-- HOOD overlay -->
-      <path d="M155,35 Q290,15 435,35 L440,200 Q290,180 150,200 Z"
+      <path d="M132,33 Q248,14 370,33 L374,189 Q248,170 128,189 Z"
             fill="${hood.fill}" stroke="${hood.stroke}" stroke-width="3"/>
       <!-- FL door -->
-      <path d="M42,205 L148,198 L142,545 L38,540 Z"
+      <path d="M36,194 L126,187 L121,515 L32,510 Z"
             fill="${fl.fill}" stroke="${fl.stroke}" stroke-width="3"/>
       <!-- FR door -->
-      <path d="M541,205 L435,198 L440,545 L545,540 Z"
+      <path d="M460,194 L370,187 L374,515 L464,510 Z"
             fill="${fr.fill}" stroke="${fr.stroke}" stroke-width="3"/>
       <!-- RL door -->
-      <path d="M39,543 L143,548 L140,838 L42,832 Z"
+      <path d="M33,513 L122,518 L119,791 L36,786 Z"
             fill="${rl.fill}" stroke="${rl.stroke}" stroke-width="3"/>
       <!-- RR door -->
-      <path d="M544,543 L439,548 L442,838 L547,832 Z"
+      <path d="M463,513 L374,518 L376,791 L466,786 Z"
             fill="${rr.fill}" stroke="${rr.stroke}" stroke-width="3"/>
       <!-- BOOT overlay -->
-      <path d="M150,840 Q290,826 442,840 L438,1058 Q290,1075 152,1058 Z"
+      <path d="M128,793 Q248,780 376,793 L373,999 Q248,1014 129,999 Z"
             fill="${boot.fill}" stroke="${boot.stroke}" stroke-width="3"/>
 
       <!-- Labels: hood -->
-      <text x="292" y="108" text-anchor="middle" font-size="40" fill="${hood.tc}" font-family="system-ui,sans-serif" font-weight="700">Hood</text>
-      <text x="292" y="152" text-anchor="middle" font-size="34" fill="${hood.tc}" font-family="system-ui,sans-serif">${hood.label}</text>
+      <text x="248" y="102" text-anchor="middle" font-size="38" fill="${hood.tc}" font-family="system-ui,sans-serif" font-weight="700">Hood</text>
+      <text x="248" y="143" text-anchor="middle" font-size="32" fill="${hood.tc}" font-family="system-ui,sans-serif">${hood.label}</text>
       <!-- FL -->
-      <text x="92" y="355" text-anchor="middle" font-size="40" fill="${fl.tc}" font-family="system-ui,sans-serif" font-weight="700">FL</text>
-      <text x="92" y="400" text-anchor="middle" font-size="34" fill="${fl.tc}" font-family="system-ui,sans-serif">${fl.label}</text>
+      <text x="78"  y="335" text-anchor="middle" font-size="38" fill="${fl.tc}"   font-family="system-ui,sans-serif" font-weight="700">FL</text>
+      <text x="78"  y="378" text-anchor="middle" font-size="32" fill="${fl.tc}"   font-family="system-ui,sans-serif">${fl.label}</text>
       <!-- FR -->
-      <text x="492" y="355" text-anchor="middle" font-size="40" fill="${fr.tc}" font-family="system-ui,sans-serif" font-weight="700">FR</text>
-      <text x="492" y="400" text-anchor="middle" font-size="34" fill="${fr.tc}" font-family="system-ui,sans-serif">${fr.label}</text>
+      <text x="418" y="335" text-anchor="middle" font-size="38" fill="${fr.tc}"   font-family="system-ui,sans-serif" font-weight="700">FR</text>
+      <text x="418" y="378" text-anchor="middle" font-size="32" fill="${fr.tc}"   font-family="system-ui,sans-serif">${fr.label}</text>
       <!-- RL -->
-      <text x="92" y="665" text-anchor="middle" font-size="40" fill="${rl.tc}" font-family="system-ui,sans-serif" font-weight="700">RL</text>
-      <text x="92" y="710" text-anchor="middle" font-size="34" fill="${rl.tc}" font-family="system-ui,sans-serif">${rl.label}</text>
+      <text x="78"  y="628" text-anchor="middle" font-size="38" fill="${rl.tc}"   font-family="system-ui,sans-serif" font-weight="700">RL</text>
+      <text x="78"  y="671" text-anchor="middle" font-size="32" fill="${rl.tc}"   font-family="system-ui,sans-serif">${rl.label}</text>
       <!-- RR -->
-      <text x="492" y="665" text-anchor="middle" font-size="40" fill="${rr.tc}" font-family="system-ui,sans-serif" font-weight="700">RR</text>
-      <text x="492" y="710" text-anchor="middle" font-size="34" fill="${rr.tc}" font-family="system-ui,sans-serif">${rr.label}</text>
+      <text x="418" y="628" text-anchor="middle" font-size="38" fill="${rr.tc}"   font-family="system-ui,sans-serif" font-weight="700">RR</text>
+      <text x="418" y="671" text-anchor="middle" font-size="32" fill="${rr.tc}"   font-family="system-ui,sans-serif">${rr.label}</text>
       <!-- Boot -->
-      <text x="292" y="938" text-anchor="middle" font-size="40" fill="${boot.tc}" font-family="system-ui,sans-serif" font-weight="700">Boot</text>
-      <text x="292" y="982" text-anchor="middle" font-size="34" fill="${boot.tc}" font-family="system-ui,sans-serif">${boot.label}</text>
+      <text x="248" y="885" text-anchor="middle" font-size="38" fill="${boot.tc}" font-family="system-ui,sans-serif" font-weight="700">Boot</text>
+      <text x="248" y="927" text-anchor="middle" font-size="32" fill="${boot.tc}" font-family="system-ui,sans-serif">${boot.label}</text>
     </svg>
   </div>`;
 
