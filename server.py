@@ -278,6 +278,17 @@ def route_all():
         return api_error(str(e))
 
 
+@app.get("/api/chargeLevel")
+@require_auth
+def route_charge_level():
+    try:
+        status = fetch_status()
+        level = status["additionalVehicleStatus"]["electricVehicleStatus"]["chargeLevel"]
+        return jsonify({"chargeLevel": level})
+    except (AuthException, ZeekrException) as e:
+        return api_error(str(e))
+
+
 @app.post("/api/refresh")
 @require_auth
 def route_refresh():
