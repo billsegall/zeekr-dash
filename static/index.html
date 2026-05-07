@@ -439,6 +439,18 @@ header {
   </div>
 </div>
 
+<div id="statsModal" style="display:none;position:fixed;inset:0;background:rgba(7,12,24,.85);z-index:1500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:640px;max-width:100%;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div style="font-size:16px;font-weight:700">Trip Statistics</div>
+      <button class="refresh-btn" onclick="document.getElementById('statsModal').style.display='none'">✕ Close</button>
+    </div>
+    <div id="statsBody" style="padding:20px">
+      <div style="color:var(--muted);font-size:13px">Loading…</div>
+    </div>
+  </div>
+</div>
+
 <header>
   <div class="header-left">
     <div class="status-dot" id="statusDot"></div>
@@ -659,7 +671,7 @@ header {
             <th>Date / Time</th>
             <th>Distance</th>
             <th>Avg speed</th>
-            <th>Consumed</th>
+            <th>Consumed (kWh/100km)</th>
             <th>Regen</th>
             <th>Energy balance</th>
           </tr>
@@ -672,6 +684,7 @@ header {
       <span id="tripsPageInfo" style="font-size:12px;color:var(--muted)">—</span>
       <button class="refresh-btn" id="tripsNext" onclick="tripsChangePage(1)">Next →</button>
       <button class="refresh-btn" onclick="downloadTripsCSV()" style="margin-left:auto">⬇ CSV</button>
+      <button class="refresh-btn" onclick="showStats()">📊 Stats</button>
     </div>
   </div>
 
@@ -1095,6 +1108,117 @@ async function downloadTripsCSV() {
     btn.disabled = false;
     btn.textContent = '⬇ CSV';
   }
+}
+
+async function fetchAllTrips() {
+  const trips = [];
+  let endTime = 0;
+  while (true) {
+    const res = await fetch(`/api/trips?size=100&days=3650&end_time=${endTime}`, { credentials: 'same-origin' });
+    if (res.status === 401) { showLoginOverlay(); return null; }
+    const data = await res.json();
+    const page = data.data || [];
+    if (!page.length) break;
+    trips.push(...page);
+    if (trips.length >= (data.total || 0)) break;
+    endTime = (data.lastId || 1) - 1;
+  }
+  return trips;
+}
+
+async function showStats() {
+  const modal = document.getElementById('statsModal');
+  const body  = document.getElementById('statsBody');
+  modal.style.display = 'flex';
+  body.innerHTML = '<div style="color:var(--muted);font-size:13px">Loading all trips…</div>';
+
+  const trips = await fetchAllTrips();
+  if (!trips) return;
+  if (!trips.length) { body.innerHTML = '<div style="color:var(--muted)">No trip data.</div>'; return; }
+
+  const n     = trips.length;
+  const dists = trips.map(t => parseFloat(t.traveledDistance) || 0);
+  const speeds= trips.map(t => parseFloat(t.avgSpeed) || 0);
+  const cons  = trips.map(t => parseFloat(t.electricConsumption) || 0).filter(v => v > 0);
+  const regens= trips.map(t => parseFloat(t.electricRegeneration) || 0);
+
+  const sum   = a => a.reduce((s, v) => s + v, 0);
+  const avg   = a => a.length ? sum(a) / a.length : 0;
+  const min   = a => Math.min(...a);
+  const max   = a => Math.max(...a);
+
+  const totalDist  = sum(dists);
+  const avgDist    = avg(dists);
+  const longestIdx = dists.indexOf(max(dists));
+  const longestTrip= trips[longestIdx];
+  const avgCons    = avg(cons);
+  const bestCons   = min(cons);
+  const worstCons  = max(cons);
+  const totalRegen  = sum(regens) / 1000;
+  const totalEnergy = trips.reduce((s, t) => s + (parseFloat(t.electricConsumption) || 0) * (parseFloat(t.traveledDistance) || 0), 0) / 100;
+  const avgSpeed   = avg(speeds);
+
+  // day-of-week distribution
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayCounts = Array(7).fill(0);
+  trips.forEach(t => dayCounts[new Date(t.reportTime).getDay()]++);
+  const busiestDay = days[dayCounts.indexOf(max(dayCounts))];
+
+  // monthly distance (last 12 months)
+  const monthlyMap = {};
+  trips.forEach(t => {
+    const d = new Date(t.reportTime);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    monthlyMap[key] = (monthlyMap[key] || 0) + (parseFloat(t.traveledDistance) || 0);
+  });
+  const months = Object.keys(monthlyMap).sort().slice(-12);
+  const maxMonthDist = max(months.map(m => monthlyMap[m]));
+
+  function statRow(label, value, sub='') {
+    return `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(26,39,64,.5)">
+      <span style="color:var(--muted);font-size:12px">${label}</span>
+      <span style="font-family:monospace;font-weight:600">${value}<span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">${sub}</span></span>
+    </div>`;
+  }
+
+  function section(title) {
+    return `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;margin:18px 0 4px">${title}</div>`;
+  }
+
+  const monthBars = months.map(m => {
+    const pct = (monthlyMap[m] / maxMonthDist * 100).toFixed(0);
+    const label = m.slice(5); // MM
+    const shortNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1">
+      <div style="font-size:10px;color:var(--muted)">${monthlyMap[m].toFixed(0)}</div>
+      <div style="height:60px;display:flex;align-items:flex-end">
+        <div style="width:18px;background:var(--blue);border-radius:3px 3px 0 0;height:${pct}%"></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted)">${shortNames[parseInt(label)]}</div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    ${section('Overview')}
+    ${statRow('Total trips', n.toLocaleString())}
+    ${statRow('Total distance', totalDist.toFixed(0), 'km')}
+    ${statRow('Avg trip distance', avgDist.toFixed(1), 'km')}
+    ${statRow('Longest trip', max(dists).toFixed(1) + ' km', new Date(longestTrip.reportTime).toLocaleDateString())}
+    ${statRow('Avg speed', avgSpeed.toFixed(1), 'km/h')}
+    ${statRow('Busiest day', busiestDay, `(${max(dayCounts)} trips)`)}
+
+    ${section('Efficiency')}
+    ${statRow('Avg consumption', avgCons.toFixed(1), 'kWh/100km')}
+    ${statRow('Best consumption', bestCons.toFixed(1), 'kWh/100km')}
+    ${statRow('Worst consumption', worstCons.toFixed(1), 'kWh/100km')}
+    ${statRow('Total energy used', totalEnergy.toFixed(1), 'kWh')}
+    ${statRow('Total regen', totalRegen.toFixed(1), 'kWh')}
+
+    ${section('Distance by Month')}
+    <div style="display:flex;gap:2px;align-items:flex-end;margin-top:8px;padding:0 4px">
+      ${monthBars}
+    </div>
+  `;
 }
 
 function selectTrip(row, idx) {
