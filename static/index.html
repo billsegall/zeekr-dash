@@ -734,46 +734,10 @@ function initMap() {
   }).addTo(map);
 
   const carIcon = L.divIcon({
-    html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 104" width="33" height="78" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,0.7))">
-  <!-- Tyres (behind body) -->
-  <rect x="0"  y="16" width="9" height="15" rx="3" fill="#111"/>
-  <rect x="35" y="16" width="9" height="15" rx="3" fill="#111"/>
-  <rect x="0"  y="71" width="9" height="15" rx="3" fill="#111"/>
-  <rect x="35" y="71" width="9" height="15" rx="3" fill="#111"/>
-  <!-- Body -->
-  <path d="M7,9 C7,5 22,3 22,3 C22,3 37,5 37,9 L38,88 C38,93 30,97 22,97 C14,97 6,93 6,88 Z" fill="#364a3f"/>
-  <!-- Body sheen (left highlight) -->
-  <path d="M7,9 L6,88 C6,88 8,91 9,90 L9,11 Z" fill="#4a6155" opacity="0.55"/>
-  <!-- Hood panel -->
-  <path d="M9,9 L35,9 L35,18 L9,18 Z" fill="#2c3e35"/>
-  <!-- Front windshield -->
-  <path d="M9,18 L35,18 L34,25 L10,25 Z" fill="#7dc8d8" opacity="0.72"/>
-  <!-- Roof (A-pillar to C-pillar) -->
-  <rect x="9" y="25" width="26" height="52" fill="#243530"/>
-  <!-- Panoramic sunroof (1.35m² = ~central 60% of roof length) -->
-  <rect x="12" y="30" width="20" height="42" rx="2" fill="#5596a8" opacity="0.68"/>
-  <!-- Sunroof frame lines -->
-  <rect x="12" y="30" width="20" height="42" rx="2" fill="none" stroke="#1d2e28" stroke-width="0.8"/>
-  <!-- Rear windshield -->
-  <path d="M10,77 L34,77 L35,84 L9,84 Z" fill="#7dc8d8" opacity="0.58"/>
-  <!-- Rear deck -->
-  <path d="M9,84 L35,84 L35,92 L9,92 Z" fill="#2c3e35"/>
-  <!-- Front full-width LED bar -->
-  <rect x="9" y="7" width="26" height="2.5" rx="1.2" fill="#e8f5c0"/>
-  <!-- Front position lights (split) -->
-  <rect x="9"  y="4" width="8" height="1.5" rx="0.7" fill="#fff8b0" opacity="0.8"/>
-  <rect x="27" y="4" width="8" height="1.5" rx="0.7" fill="#fff8b0" opacity="0.8"/>
-  <!-- Rear full-width LED bar -->
-  <rect x="9" y="92" width="26" height="2.5" rx="1.2" fill="#cc3333"/>
-  <!-- Tyre detail (rim highlight) -->
-  <rect x="1.5" y="17.5" width="6" height="12" rx="2" fill="none" stroke="#444" stroke-width="0.8"/>
-  <rect x="36.5" y="17.5" width="6" height="12" rx="2" fill="none" stroke="#444" stroke-width="0.8"/>
-  <rect x="1.5" y="72.5" width="6" height="12" rx="2" fill="none" stroke="#444" stroke-width="0.8"/>
-  <rect x="36.5" y="72.5" width="6" height="12" rx="2" fill="none" stroke="#444" stroke-width="0.8"/>
-</svg>`,
+    html: `<img src="/7x_green.png" width="32" height="62" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,0.75));display:block"/>`,
     className: '',
-    iconSize: [33, 78],
-    iconAnchor: [16, 39]
+    iconSize: [32, 62],
+    iconAnchor: [16, 31]
   });
   carMarker = L.marker([0, 0], { icon: carIcon });
 }
@@ -946,72 +910,52 @@ function renderDoors(d) {
   const hood = ds(d.engineHoodOpenStatus,         null);
   const boot = ds(d.trunkOpenStatus,              d.trunkLockStatus);
 
-  // top-down car diagram: front (hood) at top, boot at bottom
-  // viewBox 260×305; car body x=70–190, y=18–286
+  // door regions overlaid on the actual car image (583×1136 image-space coords)
+  // hood top≈y30, front-door top≈y200, front/rear divide≈y545, boot top≈y840, boot bottom≈y1060
+  // car left body edge≈x40, left door/roof join≈x140, right door/roof join≈x440, right edge≈x545
   document.getElementById('doorDiagram').innerHTML = `
-  <svg viewBox="0 0 260 305" width="100%" style="display:block;overflow:visible">
-    <!-- car body base -->
-    <path d="M72,32 Q72,18 130,16 Q188,18 188,32 L190,268 Q190,284 130,287 Q70,284 70,268 Z"
-          fill="var(--card2)" stroke="var(--border)" stroke-width="1.5"/>
+  <div style="position:relative;display:block">
+    <img src="/7x_green.png" style="width:100%;display:block;opacity:0.92"/>
+    <svg viewBox="0 0 583 1136" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible">
+      <!-- HOOD overlay -->
+      <path d="M155,35 Q290,15 435,35 L440,200 Q290,180 150,200 Z"
+            fill="${hood.fill}" stroke="${hood.stroke}" stroke-width="3"/>
+      <!-- FL door -->
+      <path d="M42,205 L148,198 L142,545 L38,540 Z"
+            fill="${fl.fill}" stroke="${fl.stroke}" stroke-width="3"/>
+      <!-- FR door -->
+      <path d="M541,205 L435,198 L440,545 L545,540 Z"
+            fill="${fr.fill}" stroke="${fr.stroke}" stroke-width="3"/>
+      <!-- RL door -->
+      <path d="M39,543 L143,548 L140,838 L42,832 Z"
+            fill="${rl.fill}" stroke="${rl.stroke}" stroke-width="3"/>
+      <!-- RR door -->
+      <path d="M544,543 L439,548 L442,838 L547,832 Z"
+            fill="${rr.fill}" stroke="${rr.stroke}" stroke-width="3"/>
+      <!-- BOOT overlay -->
+      <path d="M150,840 Q290,826 442,840 L438,1058 Q290,1075 152,1058 Z"
+            fill="${boot.fill}" stroke="${boot.stroke}" stroke-width="3"/>
 
-    <!-- HOOD (top) -->
-    <path d="M72,32 Q72,18 130,16 Q188,18 188,32 L188,68 L72,68 Z"
-          fill="${hood.fill}" stroke="${hood.stroke}" stroke-width="1"/>
-    <text x="130" y="44" text-anchor="middle" font-size="10" fill="${hood.tc}" font-family="system-ui,sans-serif" font-weight="600">Hood</text>
-    <text x="130" y="58" text-anchor="middle" font-size="9"  fill="${hood.tc}" font-family="system-ui,sans-serif">${hood.label}</text>
-
-    <!-- front windshield strip -->
-    <rect x="100" y="68" width="60" height="9" fill="#5a9aaa" opacity="0.55"/>
-
-    <!-- door seams: horizontal at 77, 165, 232; vertical x=99,161 -->
-    <line x1="72"  y1="77"  x2="188" y2="77"  stroke="var(--border)" stroke-width="0.8"/>
-    <line x1="72"  y1="165" x2="188" y2="165" stroke="var(--border)" stroke-width="0.8"/>
-    <line x1="72"  y1="232" x2="188" y2="232" stroke="var(--border)" stroke-width="0.8"/>
-    <line x1="99"  y1="77"  x2="99"  y2="232" stroke="var(--border)" stroke-width="0.8"/>
-    <line x1="161" y1="77"  x2="161" y2="232" stroke="var(--border)" stroke-width="0.8"/>
-
-    <!-- FL door -->
-    <rect x="72" y="77" width="27" height="88" fill="${fl.fill}" stroke="${fl.stroke}" stroke-width="1"/>
-    <!-- FR door -->
-    <rect x="161" y="77" width="27" height="88" fill="${fr.fill}" stroke="${fr.stroke}" stroke-width="1"/>
-    <!-- RL door -->
-    <rect x="72" y="165" width="27" height="67" fill="${rl.fill}" stroke="${rl.stroke}" stroke-width="1"/>
-    <!-- RR door -->
-    <rect x="161" y="165" width="27" height="67" fill="${rr.fill}" stroke="${rr.stroke}" stroke-width="1"/>
-
-    <!-- roof / interior centre -->
-    <rect x="99" y="77" width="62" height="155" fill="rgba(7,12,24,.6)"/>
-    <!-- panoramic sunroof -->
-    <rect x="108" y="88" width="44" height="112" rx="3" fill="#4a8090" opacity="0.38"/>
-    <rect x="108" y="88" width="44" height="112" rx="3" fill="none" stroke="#2a5060" stroke-width="0.8"/>
-
-    <!-- rear windshield strip -->
-    <rect x="100" y="228" width="60" height="9" fill="#5a9aaa" opacity="0.4"/>
-
-    <!-- BOOT (bottom) -->
-    <path d="M72,232 L188,232 L188,268 Q188,284 130,287 Q70,284 70,268 Z"
-          fill="${boot.fill}" stroke="${boot.stroke}" stroke-width="1"/>
-    <text x="130" y="256" text-anchor="middle" font-size="10" fill="${boot.tc}" font-family="system-ui,sans-serif" font-weight="600">Boot</text>
-    <text x="130" y="270" text-anchor="middle" font-size="9"  fill="${boot.tc}" font-family="system-ui,sans-serif">${boot.label}</text>
-
-    <!-- external labels LEFT -->
-    <text x="67" y="114" text-anchor="end" font-size="10" fill="${fl.tc}" font-family="system-ui,sans-serif" font-weight="600">FL</text>
-    <text x="67" y="126" text-anchor="end" font-size="9"  fill="${fl.tc}" font-family="system-ui,sans-serif">${fl.label}</text>
-    <line x1="68" y1="118" x2="72" y2="118" stroke="${fl.stroke}" stroke-width="1"/>
-
-    <text x="67" y="196" text-anchor="end" font-size="10" fill="${rl.tc}" font-family="system-ui,sans-serif" font-weight="600">RL</text>
-    <text x="67" y="208" text-anchor="end" font-size="9"  fill="${rl.tc}" font-family="system-ui,sans-serif">${rl.label}</text>
-    <line x1="68" y1="200" x2="72" y2="200" stroke="${rl.stroke}" stroke-width="1"/>
-
-    <!-- external labels RIGHT -->
-    <text x="193" y="114" text-anchor="start" font-size="10" fill="${fr.tc}" font-family="system-ui,sans-serif" font-weight="600">FR</text>
-    <text x="193" y="126" text-anchor="start" font-size="9"  fill="${fr.tc}" font-family="system-ui,sans-serif">${fr.label}</text>
-    <line x1="192" y1="118" x2="188" y2="118" stroke="${fr.stroke}" stroke-width="1"/>
-
-    <text x="193" y="196" text-anchor="start" font-size="10" fill="${rr.tc}" font-family="system-ui,sans-serif" font-weight="600">RR</text>
-    <text x="193" y="208" text-anchor="start" font-size="9"  fill="${rr.tc}" font-family="system-ui,sans-serif">${rr.label}</text>
-    <line x1="192" y1="200" x2="188" y2="200" stroke="${rr.stroke}" stroke-width="1"/>
-  </svg>`;
+      <!-- Labels: hood -->
+      <text x="292" y="108" text-anchor="middle" font-size="40" fill="${hood.tc}" font-family="system-ui,sans-serif" font-weight="700">Hood</text>
+      <text x="292" y="152" text-anchor="middle" font-size="34" fill="${hood.tc}" font-family="system-ui,sans-serif">${hood.label}</text>
+      <!-- FL -->
+      <text x="92" y="355" text-anchor="middle" font-size="40" fill="${fl.tc}" font-family="system-ui,sans-serif" font-weight="700">FL</text>
+      <text x="92" y="400" text-anchor="middle" font-size="34" fill="${fl.tc}" font-family="system-ui,sans-serif">${fl.label}</text>
+      <!-- FR -->
+      <text x="492" y="355" text-anchor="middle" font-size="40" fill="${fr.tc}" font-family="system-ui,sans-serif" font-weight="700">FR</text>
+      <text x="492" y="400" text-anchor="middle" font-size="34" fill="${fr.tc}" font-family="system-ui,sans-serif">${fr.label}</text>
+      <!-- RL -->
+      <text x="92" y="665" text-anchor="middle" font-size="40" fill="${rl.tc}" font-family="system-ui,sans-serif" font-weight="700">RL</text>
+      <text x="92" y="710" text-anchor="middle" font-size="34" fill="${rl.tc}" font-family="system-ui,sans-serif">${rl.label}</text>
+      <!-- RR -->
+      <text x="492" y="665" text-anchor="middle" font-size="40" fill="${rr.tc}" font-family="system-ui,sans-serif" font-weight="700">RR</text>
+      <text x="492" y="710" text-anchor="middle" font-size="34" fill="${rr.tc}" font-family="system-ui,sans-serif">${rr.label}</text>
+      <!-- Boot -->
+      <text x="292" y="938" text-anchor="middle" font-size="40" fill="${boot.tc}" font-family="system-ui,sans-serif" font-weight="700">Boot</text>
+      <text x="292" y="982" text-anchor="middle" font-size="34" fill="${boot.tc}" font-family="system-ui,sans-serif">${boot.label}</text>
+    </svg>
+  </div>`;
 
   document.getElementById('centralLock').innerHTML = doorLock(d.centralLockingStatus);
   document.getElementById('parkBrake').innerHTML =
