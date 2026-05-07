@@ -4,6 +4,7 @@ Zeekr dashboard REST API server.
 
 import json
 import logging
+import os
 import secrets
 import time
 from functools import wraps
@@ -29,6 +30,7 @@ ENV_FILE = Path(__file__).parent / ".env"
 
 LOGIN_EMAIL = "bill@segall.net"
 LOGIN_PASS_HASH = "scrypt:32768:8:1$3zAt5CrWbXwyLv19$833c236e3cef1e62c14baa28804ca7014d9d0132a9b12e516f437c7606333ccb0c04332088c635bcbc536d5b2f3aaf067eb39b71e4a99d0d7a83710a5bcdc526"
+API_TOKEN = os.environ.get("API_TOKEN", "")
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -154,12 +156,24 @@ def fetch_trips(size: int, days: int, end_time: int = 0):
 # Auth
 # ---------------------------------------------------------------------------
 
+def _token_valid():
+    if not API_TOKEN:
+        return False
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return secrets.compare_digest(auth_header[7:], API_TOKEN)
+    token_param = request.args.get("token", "")
+    if token_param:
+        return secrets.compare_digest(token_param, API_TOKEN)
+    return False
+
+
 def require_auth(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if not session.get("logged_in"):
-            return jsonify({"error": "Unauthorized"}), 401
-        return fn(*args, **kwargs)
+        if session.get("logged_in") or _token_valid():
+            return fn(*args, **kwargs)
+        return jsonify({"error": "Unauthorized"}), 401
     return wrapper
 
 
