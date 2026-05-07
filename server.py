@@ -180,6 +180,11 @@ def index():
     return send_from_directory("static", "index.html")
 
 
+@app.get("/<path:filename>")
+def static_files(filename):
+    return send_from_directory("static", filename)
+
+
 @app.get("/health")
 def health():
     return jsonify({"ok": True})
