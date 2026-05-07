@@ -33,7 +33,7 @@ LOGIN_PASS_HASH = "scrypt:32768:8:1$3zAt5CrWbXwyLv19$833c236e3cef1e62c14baa28804
 API_TOKEN = os.environ.get("API_TOKEN", "")
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 CORS(app, supports_credentials=True)
 
 # ---------------------------------------------------------------------------
