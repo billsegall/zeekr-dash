@@ -4,13 +4,16 @@ Zeekr dashboard REST API server.
 
 import json
 import logging
+import secrets
 import time
+from functools import wraps
 from pathlib import Path
 from threading import Lock
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
+from werkzeug.security import check_password_hash
 
 from zeekr_ev_api import ZeekrClient
 from zeekr_ev_api.exceptions import AuthException, ZeekrException
@@ -24,8 +27,12 @@ SECRETS_FILE = Path(__file__).parent / "zeekr_secrets.json"
 SESSION_FILE = Path(__file__).parent / ".session.json"
 ENV_FILE = Path(__file__).parent / ".env"
 
+LOGIN_EMAIL = "bill@segall.net"
+LOGIN_PASS_HASH = "scrypt:32768:8:1$3zAt5CrWbXwyLv19$833c236e3cef1e62c14baa28804ca7014d9d0132a9b12e516f437c7606333ccb0c04332088c635bcbc536d5b2f3aaf067eb39b71e4a99d0d7a83710a5bcdc526"
+
 app = Flask(__name__)
-CORS(app)
+app.secret_key = secrets.token_hex(32)
+CORS(app, supports_credentials=True)
 
 # ---------------------------------------------------------------------------
 # Client init
@@ -144,6 +151,19 @@ def fetch_trips(size: int, days: int, end_time: int = 0):
 
 
 # ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+def require_auth(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("logged_in"):
+            return jsonify({"error": "Unauthorized"}), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+# ---------------------------------------------------------------------------
 # Error helper
 # ---------------------------------------------------------------------------
 
@@ -162,10 +182,28 @@ def index():
 
 @app.get("/health")
 def health():
-    return jsonify({"vin": VIN, "ok": True})
+    return jsonify({"ok": True})
+
+
+@app.post("/api/login")
+def route_login():
+    data = request.get_json() or {}
+    email = data.get("email", "")
+    password = data.get("password", "")
+    if email == LOGIN_EMAIL and check_password_hash(LOGIN_PASS_HASH, password):
+        session["logged_in"] = True
+        return jsonify({"ok": True})
+    return jsonify({"error": "Invalid credentials"}), 401
+
+
+@app.post("/api/logout")
+def route_logout():
+    session.clear()
+    return jsonify({"ok": True})
 
 
 @app.get("/api/status")
+@require_auth
 def route_status():
     try:
         return jsonify(fetch_status())
@@ -174,6 +212,7 @@ def route_status():
 
 
 @app.get("/api/charging")
+@require_auth
 def route_charging():
     try:
         return jsonify({
@@ -186,6 +225,7 @@ def route_charging():
 
 
 @app.get("/api/modes")
+@require_auth
 def route_modes():
     try:
         return jsonify(fetch_modes())
@@ -194,6 +234,7 @@ def route_modes():
 
 
 @app.get("/api/travel")
+@require_auth
 def route_travel():
     try:
         return jsonify(fetch_travel_plan())
@@ -202,6 +243,7 @@ def route_travel():
 
 
 @app.get("/api/trips")
+@require_auth
 def route_trips():
     size = request.args.get("size", 20, type=int)
     days = request.args.get("days", 30, type=int)
@@ -213,6 +255,7 @@ def route_trips():
 
 
 @app.get("/api/all")
+@require_auth
 def route_all():
     try:
         return jsonify({
@@ -231,6 +274,7 @@ def route_all():
 
 
 @app.post("/api/refresh")
+@require_auth
 def route_refresh():
     """Force re-login and clear cache."""
     global client, VIN
@@ -260,4 +304,4 @@ def route_refresh():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8900, debug=False)
+    app.run(host="0.0.0.0", port=8889, debug=False)

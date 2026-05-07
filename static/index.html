@@ -332,6 +332,52 @@ header {
   margin: 10px 0;
 }
 
+/* ---- Login overlay ---- */
+#loginOverlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 28px;
+  width: 340px;
+  max-width: 90vw;
+}
+.login-box h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.login-box p  { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.login-field {
+  width: 100%;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 9px 12px;
+  margin-bottom: 10px;
+  outline: none;
+}
+.login-field:focus { border-color: var(--blue); }
+.login-btn {
+  width: 100%;
+  background: var(--blue);
+  border: none;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: opacity .15s;
+}
+.login-btn:hover { opacity: .85; }
+.login-btn:disabled { opacity: .5; cursor: default; }
+#loginErr { color: var(--red); font-size: 12px; margin-bottom: 10px; display: none; }
+
 /* ---- Loading ---- */
 .skeleton {
   background: linear-gradient(90deg, var(--card2) 25%, var(--border) 50%, var(--card2) 75%);
@@ -351,9 +397,47 @@ header {
   color: var(--muted);
   z-index: 10;
 }
+
+/* ---- Location Visual ---- */
+#location-view {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  background: var(--card2);
+}
+
+.car-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.location-pin {
+  position: absolute;
+  top: 55%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  filter: drop-shadow(0 0 4px rgba(0,0,0,0.5));
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
+
+<div id="loginOverlay" style="display:none">
+  <div class="login-box">
+    <h2>Zeekr 7X</h2>
+    <p>Sign in to continue</p>
+    <div id="loginErr"></div>
+    <input id="loginEmail" class="login-field" type="email" placeholder="Email" autocomplete="username">
+    <input id="loginPass"  class="login-field" type="password" placeholder="Password" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
 
 <header>
   <div class="header-left">
@@ -366,6 +450,7 @@ header {
   <div class="header-right">
     <span class="last-updated" id="lastUpdated">—</span>
     <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
+    <button class="refresh-btn" onclick="doLogout()">Sign out</button>
   </div>
 </header>
 
@@ -594,6 +679,51 @@ header {
 
 <script>
 // ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+function showLoginOverlay() {
+  document.getElementById('loginOverlay').style.display = 'flex';
+}
+function hideLoginOverlay() {
+  document.getElementById('loginOverlay').style.display = 'none';
+}
+
+async function doLogin() {
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  const email = document.getElementById('loginEmail').value;
+  const pass  = document.getElementById('loginPass').value;
+  btn.disabled = true;
+  err.style.display = 'none';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ email, password: pass }),
+    });
+    if (res.ok) {
+      hideLoginOverlay();
+      refresh();
+    } else {
+      const d = await res.json();
+      err.textContent = d.error || 'Login failed';
+      err.style.display = 'block';
+    }
+  } catch (e) {
+    err.textContent = 'Network error';
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+  showLoginOverlay();
+}
+
+// ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 let map, carMarker, tripLayers = [];
@@ -744,7 +874,7 @@ function renderClimate(c) {
   `).join('') + `
     <div class="climate-item" style="grid-column:span 2">
       <div class="ci-label">Sunroof</div>
-      <div class="ci-val">${c.sunroofOpenStatus === '1' ? badge('Open', 'amber') : badge('Closed')}</div>
+      <div class="ci-val">${c.curtainPos > 0 ? badge('Open ' + c.curtainPos + '%', 'amber') : badge('Closed')}</div>
     </div>
     <div class="climate-item" style="grid-column:span 2">
       <div class="ci-label">Steering heat</div>
@@ -923,7 +1053,8 @@ async function tripsChangePage(delta) {
   }
   tripsPage = newPage;
   const endTime = tripsEndTimeStack[tripsPage - 1] ?? 0;
-  const res = await fetch(`/api/trips?size=${TRIPS_PAGE_SIZE}&days=365&end_time=${endTime}`);
+  const res = await fetch(`/api/trips?size=${TRIPS_PAGE_SIZE}&days=365&end_time=${endTime}`, { credentials: 'same-origin' });
+  if (res.status === 401) { showLoginOverlay(); return; }
   const data = await res.json();
   renderTrips(data);
 }
@@ -936,7 +1067,8 @@ async function downloadTripsCSV() {
     const allTrips = [];
     let endTime = 0;
     while (true) {
-      const res = await fetch(`/api/trips?size=100&days=365&end_time=${endTime}`);
+      const res = await fetch(`/api/trips?size=100&days=365&end_time=${endTime}`, { credentials: 'same-origin' });
+      if (res.status === 401) { showLoginOverlay(); break; }
       const data = await res.json();
       const page = data.data || [];
       if (!page.length) break;
@@ -979,9 +1111,13 @@ function selectTrip(row, idx) {
 // ---------------------------------------------------------------------------
 async function fetchAll() {
   const [allRes, tripsRes] = await Promise.all([
-    fetch('/api/all'),
-    fetch(`/api/trips?size=${TRIPS_PAGE_SIZE}&days=365`),
+    fetch('/api/all', { credentials: 'same-origin' }),
+    fetch(`/api/trips?size=${TRIPS_PAGE_SIZE}&days=365`, { credentials: 'same-origin' }),
   ]);
+  if (allRes.status === 401 || tripsRes.status === 401) {
+    showLoginOverlay();
+    throw new Error('Unauthorized');
+  }
   if (!allRes.ok || !tripsRes.ok) throw new Error('API error');
   return {
     all:   await allRes.json(),
