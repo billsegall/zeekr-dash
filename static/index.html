@@ -612,6 +612,14 @@ header {
     <div class="card-header"><span class="icon">🚪</span> Doors</div>
     <div class="card-body" style="padding:10px 14px">
       <div id="doorDiagram"></div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Boot</span>
+        <button class="ctrl-btn" onclick="sendControl(this,'boot_open')">Open</button>
+        <button class="ctrl-btn" onclick="sendControl(this,'boot_close')">Close</button>
+        <div class="ctrl-spacer"></div>
+        <span class="ctrl-label">Frunk</span>
+        <button class="ctrl-btn" onclick="confirmCtrl(this,'Unlock frunk?','frunk_unlock')">Unlock</button>
+      </div>
     </div>
   </div>
 
@@ -1146,7 +1154,7 @@ function renderModes(m) {
     { key: 'panicState',         label: 'Panic Alarm',     active: m.panicState === '1' },
     { key: 'visitorModeState',   label: 'Visitor Mode',    active: m.visitorModeState === '1' },
     { key: 'privacyMode',        label: `Privacy Mode`,    active: m.privacyMode !== '0' },
-    { key: 'liveDetectionState', label: `Live Detection`,  active: m.liveDetectionState !== '0' },
+    { key: 'liveDetectionState', label: `Live Detection`,  active: m.liveDetectionState !== '0', offAction: 'live_detection_off' },
   ];
   document.getElementById('modesGrid').innerHTML = modes.map(mode => {
     const offBtn = mode.offAction && mode.active
