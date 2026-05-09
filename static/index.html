@@ -492,21 +492,10 @@ header {
     </div>
   </div>
 
-  <!-- Map -->
-  <div class="card col-8" id="cardMap">
-    <div class="card-header">
-      <span class="icon">📍</span> Location
-      <span style="margin-left:auto;font-size:10px" id="mapCoords">—</span>
-    </div>
-    <div id="map"></div>
-  </div>
-
-  <!-- Doors -->
-  <div class="card col-4" id="cardDoors">
-    <div class="card-header"><span class="icon">🚪</span> Doors &amp; Security</div>
-    <div class="card-body" style="padding:10px 14px">
-      <div id="doorDiagram"></div>
-      <hr class="divider">
+  <!-- Lock / Brake -->
+  <div class="card col-4" id="cardSecurity">
+    <div class="card-header"><span class="icon">🔒</span> Security</div>
+    <div class="card-body">
       <div class="stat-row">
         <span class="stat-label">Central lock</span>
         <span id="centralLock">—</span>
@@ -521,19 +510,23 @@ header {
   <!-- Climate -->
   <div class="card col-4" id="cardClimate">
     <div class="card-header"><span class="icon">🌡</span> Climate</div>
-    <div class="card-body">
-      <div class="temp-big" id="interiorTemp">—<span class="temp-unit">°C</span></div>
-      <div style="margin-top:4px">
-        <span id="preClimate">—</span>
-      </div>
-      <div class="climate-grid" id="windowGrid">
-        <!-- filled by JS -->
-      </div>
-      <hr class="divider">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">SEAT HEATING / VENT</div>
-      <div id="seatGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <!-- filled by JS -->
-      </div>
+    <div id="climateDiagram" style="display:flex;justify-content:center;padding:10px 0"></div>
+  </div>
+
+  <!-- Map -->
+  <div class="card col-8" id="cardMap">
+    <div class="card-header">
+      <span class="icon">📍</span> Location
+      <span style="margin-left:auto;font-size:10px" id="mapCoords">—</span>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Doors -->
+  <div class="card col-4" id="cardDoors">
+    <div class="card-header"><span class="icon">🚪</span> Doors</div>
+    <div class="card-body" style="padding:10px 14px">
+      <div id="doorDiagram"></div>
     </div>
   </div>
 
@@ -734,21 +727,33 @@ function initMap() {
   }).addTo(map);
 
   const carIcon = L.divIcon({
-    html: `<img src="/7x_green.png" width="32" height="62" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,0.75));display:block"/>`,
+    html: `<img src="/7x.png" width="16" height="31" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,0.75));display:block"/>`,
     className: '',
-    iconSize: [32, 62],
-    iconAnchor: [16, 31]
+    iconSize: [16, 31],
+    iconAnchor: [8, 16]
   });
   carMarker = L.marker([0, 0], { icon: carIcon });
 }
 
-function updateMapPosition(lat, lng) {
+async function updateMapPosition(lat, lng) {
   if (!lat || !lng) return;
   const ll = [parseFloat(lat), parseFloat(lng)];
   carMarker.setLatLng(ll).addTo(map);
   map.setView(ll);
-  document.getElementById('mapCoords').textContent =
-    `${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`;
+  const mapsUrl = `https://www.google.com/maps?q=${ll[0]},${ll[1]}`;
+  const coordsEl = document.getElementById('mapCoords');
+  coordsEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${ll[0].toFixed(5)}, ${ll[1].toFixed(5)}</a>`;
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${ll[0]}&lon=${ll[1]}&format=json`, {
+      headers: { 'Accept-Language': 'en' }
+    });
+    const d = await r.json();
+    const addr = d.address;
+    const street = [addr.house_number, addr.road].filter(Boolean).join(' ');
+    const parts = [street, addr.suburb || addr.town || addr.city].filter(Boolean);
+    const label = parts.length ? parts.join(', ') : d.display_name.split(',').slice(0,2).join(',').trim();
+    coordsEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${label}</a>`;
+  } catch (_) {}
 }
 
 function showTripOnMap(trackPoints) {
@@ -844,53 +849,67 @@ function renderBattery(ev, maint, chargingLimit) {
 
 function renderClimate(c) {
   const temp = parseFloat(c.interiorTemp);
-  document.getElementById('interiorTemp').innerHTML =
-    (isNaN(temp) ? '—' : temp.toFixed(1)) + '<span class="temp-unit">°C</span>';
+  const tempStr = isNaN(temp) ? '—°C' : temp.toFixed(1) + '°C';
 
-  document.getElementById('preClimate').innerHTML =
-    c.preClimateActive ? badge('Pre-climate active', 'blue') : badge('Climate off');
+  function wc(status) { return status === '2' ? '#e2e8f0' : '#f59e0b'; }
+  function wt(status, pos) {
+    if (status === '2') return 'Closed';
+    if (status === '0') return `Open ${pos}%`;
+    return `raw:${status}`;
+  }
+  function hc(v) { return v > 0 ? '#f59e0b' : '#e2e8f0'; }
+  function vc(v) { return v > 0 ? '#3b82f6' : '#e2e8f0'; }
+  function seatLine(heat, vent) {
+    return `🔥${heat > 0 ? heat : '–'}  💨${vent > 0 ? vent : '–'}`;
+  }
 
-  const windows = [
-    { id: 'winFL', label: 'FL', status: c.winStatusDriver,         pos: c.winPosDriver },
-    { id: 'winFR', label: 'FR', status: c.winStatusPassenger,      pos: c.winPosPassenger },
-    { id: 'winRL', label: 'RL', status: c.winStatusDriverRear,     pos: c.winPosDriverRear },
-    { id: 'winRR', label: 'RR', status: c.winStatusPassengerRear,  pos: c.winPosPassengerRear },
-  ];
-  document.getElementById('windowGrid').innerHTML = windows.map(w => `
-    <div class="climate-item">
-      <div class="ci-label">${w.label}</div>
-      <div class="ci-val">${winState(w.status, w.pos)}</div>
-    </div>
-  `).join('') + `
-    <div class="climate-item" style="grid-column:span 2">
-      <div class="ci-label">Sunroof</div>
-      <div class="ci-val">${c.curtainPos > 0 ? badge('Open ' + c.curtainPos + '%', 'amber') : badge('Closed')}</div>
-    </div>
-    <div class="climate-item" style="grid-column:span 2">
-      <div class="ci-label">Steering heat</div>
-      <div class="ci-val">${c.steerWhlHeatingSts === '2' ? badge('Off') : badge('On', 'amber')}</div>
-    </div>
-  `;
+  const flH = parseInt(c.drvHeatSts) || 0,    flV = parseInt(c.drvVentSts) || 0;
+  const frH = parseInt(c.passHeatingSts) || 0, frV = parseInt(c.passVentSts) || 0;
+  const rlH = parseInt(c.rlHeatingSts) || 0,   rlV = parseInt(c.rlVentSts) || 0;
+  const rrH = parseInt(c.rrHeatingSts) || 0,   rrV = parseInt(c.rrVentSts) || 0;
 
-  const seats = [
-    { label: 'FL', heat: c.drvHeatSts,   vent: c.drvVentSts },
-    { label: 'FR', heat: c.passHeatingSts, vent: c.passVentSts },
-    { label: 'RL', heat: c.rlHeatingSts,  vent: c.rlVentSts },
-    { label: 'RR', heat: c.rrHeatingSts,  vent: c.rrVentSts },
-  ];
-  document.getElementById('seatGrid').innerHTML = seats.map(s => {
-    const heat = parseInt(s.heat);
-    const vent = parseInt(s.vent);
-    const heatColor = heat > 0 ? 'var(--amber)' : 'var(--muted)';
-    const ventColor = vent > 0 ? 'var(--blue)'  : 'var(--muted)';
-    return `<div class="climate-item">
-      <div class="ci-label">${s.label}</div>
-      <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">
-        <span style="font-size:13px;color:${heatColor}" title="Heat lv ${heat}">🔥${heat > 0 ? heat : ''}</span>
-        <span style="font-size:13px;color:${ventColor}" title="Vent lv ${vent}">💨${vent > 0 ? vent : ''}</span>
-      </div>
-    </div>`;
-  }).join('');
+  const steerOn  = c.steerWhlHeatingSts !== '2';
+  const shadeOn  = c.curtainPos > 0;
+
+  document.getElementById('climateDiagram').innerHTML = `
+  <div style="position:relative;display:block;width:62%">
+    <img src="/7x.png" style="width:100%;display:block;opacity:0.85"/>
+    <svg viewBox="0 0 496 1072" style="position:absolute;top:0;left:0;width:100%;height:100%">
+      <!-- Interior temp -->
+      <text x="248" y="455" text-anchor="middle" font-size="54" fill="#e2e8f0" font-family="system-ui,sans-serif" font-weight="700">${tempStr}</text>
+      <text x="248" y="498" text-anchor="middle" font-size="28" fill="${c.preClimateActive ? '#3b82f6' : '#e2e8f0'}" font-family="system-ui,sans-serif">${c.preClimateActive ? 'Climate On' : 'Climate Off'}</text>
+
+      <!-- Steering heat (front) -->
+      <text x="248" y="140" text-anchor="middle" font-size="28" fill="${steerOn ? '#f59e0b' : '#e2e8f0'}" font-family="system-ui,sans-serif">Steer ${steerOn ? 'On' : 'Off'}</text>
+
+      <!-- Sunshade (rear) -->
+      <text x="248" y="870" text-anchor="middle" font-size="28" fill="${shadeOn ? '#f59e0b' : '#e2e8f0'}" font-family="system-ui,sans-serif">${shadeOn ? `Shade ${c.curtainPos}%` : 'Shade Closed'}</text>
+
+      <!-- FL -->
+      <text x="72" y="295" text-anchor="middle" font-size="34" fill="#e2e8f0" font-family="system-ui,sans-serif" font-weight="700">FL</text>
+      <text x="72" y="330" text-anchor="middle" font-size="24" fill="${wc(c.winStatusDriver)}" font-family="system-ui,sans-serif">${wt(c.winStatusDriver, c.winPosDriver)}</text>
+      <text x="72" y="365" text-anchor="middle" font-size="22" fill="${hc(flH)}" font-family="system-ui,sans-serif">🔥${flH > 0 ? flH : '–'}</text>
+      <text x="72" y="395" text-anchor="middle" font-size="22" fill="${vc(flV)}" font-family="system-ui,sans-serif">💨${flV > 0 ? flV : '–'}</text>
+
+      <!-- FR -->
+      <text x="424" y="295" text-anchor="middle" font-size="34" fill="#e2e8f0" font-family="system-ui,sans-serif" font-weight="700">FR</text>
+      <text x="424" y="330" text-anchor="middle" font-size="24" fill="${wc(c.winStatusPassenger)}" font-family="system-ui,sans-serif">${wt(c.winStatusPassenger, c.winPosPassenger)}</text>
+      <text x="424" y="365" text-anchor="middle" font-size="22" fill="${hc(frH)}" font-family="system-ui,sans-serif">🔥${frH > 0 ? frH : '–'}</text>
+      <text x="424" y="395" text-anchor="middle" font-size="22" fill="${vc(frV)}" font-family="system-ui,sans-serif">💨${frV > 0 ? frV : '–'}</text>
+
+      <!-- RL -->
+      <text x="72" y="590" text-anchor="middle" font-size="34" fill="#e2e8f0" font-family="system-ui,sans-serif" font-weight="700">RL</text>
+      <text x="72" y="625" text-anchor="middle" font-size="24" fill="${wc(c.winStatusDriverRear)}" font-family="system-ui,sans-serif">${wt(c.winStatusDriverRear, c.winPosDriverRear)}</text>
+      <text x="72" y="660" text-anchor="middle" font-size="22" fill="${hc(rlH)}" font-family="system-ui,sans-serif">🔥${rlH > 0 ? rlH : '–'}</text>
+      <text x="72" y="690" text-anchor="middle" font-size="22" fill="${vc(rlV)}" font-family="system-ui,sans-serif">💨${rlV > 0 ? rlV : '–'}</text>
+
+      <!-- RR -->
+      <text x="424" y="590" text-anchor="middle" font-size="34" fill="#e2e8f0" font-family="system-ui,sans-serif" font-weight="700">RR</text>
+      <text x="424" y="625" text-anchor="middle" font-size="24" fill="${wc(c.winStatusPassengerRear)}" font-family="system-ui,sans-serif">${wt(c.winStatusPassengerRear, c.winPosPassengerRear)}</text>
+      <text x="424" y="660" text-anchor="middle" font-size="22" fill="${hc(rrH)}" font-family="system-ui,sans-serif">🔥${rrH > 0 ? rrH : '–'}</text>
+      <text x="424" y="690" text-anchor="middle" font-size="22" fill="${vc(rrV)}" font-family="system-ui,sans-serif">💨${rrV > 0 ? rrV : '–'}</text>
+    </svg>
+  </div>`;
 }
 
 function renderDoors(d) {
@@ -899,8 +918,8 @@ function renderDoors(d) {
     const isUnlocked = lock !== null && lock !== '1';
     if (isOpen)     return { fill: 'rgba(239,68,68,.22)',   stroke: 'rgba(239,68,68,.65)',   tc: '#ef4444', label: 'Open' };
     if (isUnlocked) return { fill: 'rgba(245,158,11,.15)',  stroke: 'rgba(245,158,11,.55)',  tc: '#f59e0b', label: 'Unlocked' };
-    if (lock !== null) return { fill: 'rgba(34,197,94,.07)', stroke: 'rgba(34,197,94,.2)',  tc: '#64748b', label: 'Locked' };
-    return              { fill: 'rgba(13,21,38,.4)',         stroke: 'rgba(26,39,64,.5)',    tc: '#64748b', label: 'Closed' };
+    if (lock !== null) return { fill: 'rgba(34,197,94,.07)', stroke: 'rgba(34,197,94,.2)',  tc: '#e2e8f0', label: 'Locked' };
+    return              { fill: 'rgba(13,21,38,.4)',         stroke: 'rgba(26,39,64,.5)',    tc: '#e2e8f0', label: 'Closed' };
   }
 
   const fl   = ds(d.doorOpenStatusDriver,        d.doorLockStatusDriver);
@@ -914,47 +933,24 @@ function renderDoors(d) {
   // hood top≈y30, front-door top≈y200, front/rear divide≈y545, boot top≈y840, boot bottom≈y1060
   // car left body edge≈x40, left door/roof join≈x140, right door/roof join≈x440, right edge≈x545
   document.getElementById('doorDiagram').innerHTML = `
-  <div style="position:relative;display:block">
-    <img src="/7x_green.png" style="width:100%;display:block;opacity:0.92"/>
+  <div style="display:flex;justify-content:center">
+  <div style="position:relative;display:block;width:62%">
+    <img src="/7x.png" style="width:100%;display:block;opacity:0.92"/>
     <svg viewBox="0 0 496 1072" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible">
-      <!-- HOOD overlay -->
-      <path d="M132,33 Q248,14 370,33 L374,189 Q248,170 128,189 Z"
-            fill="${hood.fill}" stroke="${hood.stroke}" stroke-width="3"/>
-      <!-- FL door -->
-      <path d="M36,194 L126,187 L121,515 L32,510 Z"
-            fill="${fl.fill}" stroke="${fl.stroke}" stroke-width="3"/>
-      <!-- FR door -->
-      <path d="M460,194 L370,187 L374,515 L464,510 Z"
-            fill="${fr.fill}" stroke="${fr.stroke}" stroke-width="3"/>
-      <!-- RL door -->
-      <path d="M33,513 L122,518 L119,791 L36,786 Z"
-            fill="${rl.fill}" stroke="${rl.stroke}" stroke-width="3"/>
-      <!-- RR door -->
-      <path d="M463,513 L374,518 L376,791 L466,786 Z"
-            fill="${rr.fill}" stroke="${rr.stroke}" stroke-width="3"/>
-      <!-- BOOT overlay -->
-      <path d="M128,793 Q248,780 376,793 L373,999 Q248,1014 129,999 Z"
-            fill="${boot.fill}" stroke="${boot.stroke}" stroke-width="3"/>
-
-      <!-- Labels: hood -->
-      <text x="248" y="102" text-anchor="middle" font-size="38" fill="${hood.tc}" font-family="system-ui,sans-serif" font-weight="700">Hood</text>
+      <text x="248" y="102" text-anchor="middle" font-size="38" fill="${hood.tc}" font-family="system-ui,sans-serif" font-weight="700">Frunk</text>
       <text x="248" y="143" text-anchor="middle" font-size="32" fill="${hood.tc}" font-family="system-ui,sans-serif">${hood.label}</text>
-      <!-- FL -->
       <text x="78"  y="335" text-anchor="middle" font-size="38" fill="${fl.tc}"   font-family="system-ui,sans-serif" font-weight="700">FL</text>
       <text x="78"  y="378" text-anchor="middle" font-size="32" fill="${fl.tc}"   font-family="system-ui,sans-serif">${fl.label}</text>
-      <!-- FR -->
       <text x="418" y="335" text-anchor="middle" font-size="38" fill="${fr.tc}"   font-family="system-ui,sans-serif" font-weight="700">FR</text>
       <text x="418" y="378" text-anchor="middle" font-size="32" fill="${fr.tc}"   font-family="system-ui,sans-serif">${fr.label}</text>
-      <!-- RL -->
       <text x="78"  y="628" text-anchor="middle" font-size="38" fill="${rl.tc}"   font-family="system-ui,sans-serif" font-weight="700">RL</text>
       <text x="78"  y="671" text-anchor="middle" font-size="32" fill="${rl.tc}"   font-family="system-ui,sans-serif">${rl.label}</text>
-      <!-- RR -->
       <text x="418" y="628" text-anchor="middle" font-size="38" fill="${rr.tc}"   font-family="system-ui,sans-serif" font-weight="700">RR</text>
       <text x="418" y="671" text-anchor="middle" font-size="32" fill="${rr.tc}"   font-family="system-ui,sans-serif">${rr.label}</text>
-      <!-- Boot -->
       <text x="248" y="885" text-anchor="middle" font-size="38" fill="${boot.tc}" font-family="system-ui,sans-serif" font-weight="700">Boot</text>
       <text x="248" y="927" text-anchor="middle" font-size="32" fill="${boot.tc}" font-family="system-ui,sans-serif">${boot.label}</text>
     </svg>
+  </div>
   </div>`;
 
   document.getElementById('centralLock').innerHTML = doorLock(d.centralLockingStatus);
