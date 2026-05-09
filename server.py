@@ -14,7 +14,7 @@ from threading import Lock
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from zeekr_ev_api import ZeekrClient
 from zeekr_ev_api.exceptions import AuthException, ZeekrException
@@ -27,14 +27,40 @@ log = logging.getLogger(__name__)
 SECRETS_FILE = Path(__file__).parent / "zeekr_secrets.json"
 SESSION_FILE = Path(__file__).parent / ".session.json"
 ENV_FILE = Path(__file__).parent / ".env"
+USERS_FILE = Path(__file__).parent / "users.json"
 
-LOGIN_EMAIL = "bill@segall.net"
-LOGIN_PASS_HASH = "scrypt:32768:8:1$3zAt5CrWbXwyLv19$833c236e3cef1e62c14baa28804ca7014d9d0132a9b12e516f437c7606333ccb0c04332088c635bcbc536d5b2f3aaf067eb39b71e4a99d0d7a83710a5bcdc526"
 API_TOKEN = os.environ.get("API_TOKEN", "")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 CORS(app, supports_credentials=True)
+
+# ---------------------------------------------------------------------------
+# User store
+# ---------------------------------------------------------------------------
+
+def _load_users() -> list:
+    if not USERS_FILE.exists():
+        return []
+    with open(USERS_FILE) as f:
+        return json.load(f).get("users", [])
+
+
+def _save_users(users: list):
+    with open(USERS_FILE, "w") as f:
+        json.dump({"users": users}, f, indent=2)
+
+
+def _find_user_by_email(email: str) -> dict | None:
+    return next((u for u in _load_users() if u["email"] == email), None)
+
+
+def _find_user_by_id(uid: str) -> dict | None:
+    return next((u for u in _load_users() if u["id"] == uid), None)
+
+
+def _user_public(u: dict) -> dict:
+    return {k: v for k, v in u.items() if k != "password_hash"}
 
 # ---------------------------------------------------------------------------
 # Client init
@@ -171,9 +197,33 @@ def _token_valid():
 def require_auth(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if session.get("logged_in") or _token_valid():
+        if session.get("user_id") or _token_valid():
             return fn(*args, **kwargs)
         return jsonify({"error": "Unauthorized"}), 401
+    return wrapper
+
+
+def require_write(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if _token_valid():
+            return fn(*args, **kwargs)
+        if not session.get("user_id"):
+            return jsonify({"error": "Unauthorized"}), 401
+        if not session.get("can_write"):
+            return jsonify({"error": "Forbidden"}), 403
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def require_admin(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({"error": "Unauthorized"}), 401
+        if not session.get("is_admin"):
+            return jsonify({"error": "Forbidden"}), 403
+        return fn(*args, **kwargs)
     return wrapper
 
 
@@ -206,6 +256,11 @@ def map_page():
     return send_from_directory("static", "map.html")
 
 
+@app.get("/admin")
+def admin_page():
+    return send_from_directory("static", "admin.html")
+
+
 @app.get("/<path:filename>")
 def static_files(filename):
     return send_from_directory("static", filename)
@@ -221,9 +276,12 @@ def route_login():
     data = request.get_json() or {}
     email = data.get("email", "")
     password = data.get("password", "")
-    if email == LOGIN_EMAIL and check_password_hash(LOGIN_PASS_HASH, password):
-        session["logged_in"] = True
-        return jsonify({"ok": True})
+    user = _find_user_by_email(email)
+    if user and check_password_hash(user["password_hash"], password):
+        session["user_id"] = user["id"]
+        session["is_admin"] = user.get("is_admin", False)
+        session["can_write"] = user.get("can_write", False)
+        return jsonify({"ok": True, "is_admin": user.get("is_admin", False), "can_write": user.get("can_write", False)})
     return jsonify({"error": "Invalid credentials"}), 401
 
 
@@ -231,6 +289,20 @@ def route_login():
 def route_logout():
     session.clear()
     return jsonify({"ok": True})
+
+
+@app.get("/api/me")
+def route_me():
+    if _token_valid():
+        return jsonify({"ok": True, "is_admin": False, "can_write": True, "email": None})
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
+    user = _find_user_by_id(uid)
+    if not user:
+        session.clear()
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({"ok": True, "is_admin": user.get("is_admin", False), "can_write": user.get("can_write", False), "email": user["email"]})
 
 
 @app.get("/api/status")
@@ -316,7 +388,7 @@ def route_charge_level():
 
 
 @app.post("/api/control")
-@require_auth
+@require_write
 def route_control():
     data = request.get_json() or {}
     action = data.get("action")
@@ -399,6 +471,8 @@ def route_control():
             ok = client.do_remote_control(VIN, command, service_id, setting)
 
         elif action == "_raw":
+            if not session.get("is_admin") and not _token_valid():
+                return api_error("Forbidden", 403)
             service_id = data.get("serviceId", "")
             command    = data.get("command", "start")
             setting    = data.get("setting", {})
@@ -429,8 +503,74 @@ def route_control():
         return api_error(str(e))
 
 
+@app.get("/api/admin/users")
+@require_admin
+def admin_list_users():
+    return jsonify([_user_public(u) for u in _load_users()])
+
+
+@app.post("/api/admin/users")
+@require_admin
+def admin_create_user():
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    if not email or not password:
+        return api_error("email and password required", 400)
+    users = _load_users()
+    if any(u["email"] == email for u in users):
+        return api_error("email already exists", 400)
+    user = {
+        "id": secrets.token_hex(16),
+        "email": email,
+        "password_hash": generate_password_hash(password),
+        "is_admin": bool(data.get("is_admin", False)),
+        "can_write": bool(data.get("can_write", False)),
+    }
+    users.append(user)
+    _save_users(users)
+    return jsonify(_user_public(user)), 201
+
+
+@app.put("/api/admin/users/<uid>")
+@require_admin
+def admin_update_user(uid):
+    data = request.get_json() or {}
+    users = _load_users()
+    user = next((u for u in users if u["id"] == uid), None)
+    if not user:
+        return api_error("not found", 404)
+    if "is_admin" in data and not data["is_admin"]:
+        admin_count = sum(1 for u in users if u.get("is_admin") and u["id"] != uid)
+        if admin_count == 0:
+            return api_error("cannot remove last admin", 400)
+    if data.get("password"):
+        user["password_hash"] = generate_password_hash(data["password"])
+    if "is_admin" in data:
+        user["is_admin"] = bool(data["is_admin"])
+    if "can_write" in data:
+        user["can_write"] = bool(data["can_write"])
+    _save_users(users)
+    return jsonify(_user_public(user))
+
+
+@app.delete("/api/admin/users/<uid>")
+@require_admin
+def admin_delete_user(uid):
+    if session.get("user_id") == uid:
+        return api_error("cannot delete yourself", 400)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == uid), None)
+    if not user:
+        return api_error("not found", 404)
+    if user.get("is_admin") and sum(1 for u in users if u.get("is_admin")) <= 1:
+        return api_error("cannot delete last admin", 400)
+    _save_users([u for u in users if u["id"] != uid])
+    return jsonify({"ok": True})
+
+
 @app.post("/api/refresh")
-@require_auth
+@require_admin
 def route_refresh():
     """Force re-login and clear cache."""
     global client, VIN

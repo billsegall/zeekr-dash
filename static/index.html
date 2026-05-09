@@ -68,6 +68,9 @@ header {
   transition: background .15s;
 }
 .refresh-btn:hover { background: var(--border); }
+.admin-link { font-size: 12px; color: var(--blue); text-decoration: none; display: none; }
+.admin-link:hover { text-decoration: underline; }
+body.read-only .ctrl-row { display: none !important; }
 
 /* ---- Grid ---- */
 .grid {
@@ -482,6 +485,7 @@ header {
   </div>
   <div class="header-right">
     <span class="last-updated" id="lastUpdated">—</span>
+    <a class="admin-link" id="adminLink" href="/admin">Admin</a>
     <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
     <button class="refresh-btn" onclick="doLogout()">Sign out</button>
   </div>
@@ -784,6 +788,27 @@ function hideLoginOverlay() {
   document.getElementById('loginOverlay').style.display = 'none';
 }
 
+function applyUserState(u) {
+  document.getElementById('adminLink').style.display = u.is_admin ? 'inline' : 'none';
+  if (u.can_write) {
+    document.body.classList.remove('read-only');
+  } else {
+    document.body.classList.add('read-only');
+  }
+}
+
+async function initSession() {
+  try {
+    const res = await fetch('/api/me', { credentials: 'same-origin' });
+    if (!res.ok) { showLoginOverlay(); return; }
+    const u = await res.json();
+    applyUserState(u);
+    refresh();
+  } catch (e) {
+    showLoginOverlay();
+  }
+}
+
 async function doLogin() {
   const btn = document.getElementById('loginBtn');
   const err = document.getElementById('loginErr');
@@ -799,6 +824,8 @@ async function doLogin() {
       body: JSON.stringify({ email, password: pass }),
     });
     if (res.ok) {
+      const u = await res.json();
+      applyUserState(u);
       hideLoginOverlay();
       refresh();
     } else {
@@ -816,6 +843,8 @@ async function doLogin() {
 
 async function doLogout() {
   await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+  document.body.classList.remove('read-only');
+  document.getElementById('adminLink').style.display = 'none';
   showLoginOverlay();
 }
 
@@ -1509,7 +1538,7 @@ async function refresh() {
 // Boot
 // ---------------------------------------------------------------------------
 initMap();
-refresh();
+initSession();
 </script>
 </body>
 </html>

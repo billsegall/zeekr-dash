@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeekr 7X — Admin</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #070c18;
+  --card: #0d1526;
+  --card2: #111d33;
+  --border: #1a2740;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+}
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--card); }
+.header-title { font-size: 17px; font-weight: 600; }
+.header-right { display: flex; gap: 10px; align-items: center; }
+.btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--card2); color: var(--text); cursor: pointer; font-size: 13px; }
+.btn:hover { background: #1a2a4a; }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.primary:hover { background: #2563eb; }
+.btn.danger { background: transparent; border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: rgba(239,68,68,0.1); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+main { max-width: 900px; margin: 0 auto; padding: 24px 20px; }
+h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; padding: 0 10px 10px 0; }
+td { padding: 10px 10px 10px 0; border-top: 1px solid var(--border); vertical-align: middle; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge.yes { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge.no { background: rgba(100,116,139,0.15); color: var(--muted); }
+.actions { display: flex; gap: 6px; }
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.field input[type=email], .field input[type=password], .field input[type=text] {
+  padding: 7px 10px; background: var(--card2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; min-width: 180px;
+}
+.field input:focus { outline: none; border-color: var(--blue); }
+.check-label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; padding-bottom: 7px; }
+.err { color: var(--red); font-size: 13px; margin-top: 10px; display: none; }
+.ok { color: var(--green); font-size: 13px; margin-top: 10px; display: none; }
+
+/* Modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 200; }
+.modal-backdrop.open { display: flex; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 360px; max-width: 480px; width: 90%; }
+.modal h3 { font-size: 15px; margin-bottom: 16px; }
+.modal .form-row { flex-direction: column; }
+.modal .field { width: 100%; }
+.modal .field input { width: 100%; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">Zeekr 7X — Admin</div>
+  <div class="header-right">
+    <a href="/" class="btn">Dashboard</a>
+    <button class="btn" onclick="doLogout()">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Users</h2>
+    <table id="userTable">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Admin</th>
+          <th>Write</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="userTableBody">
+        <tr><td colspan="4" style="color:var(--muted)">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <h2 style="margin-top: 28px">Add user</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="newEmail" placeholder="user@example.com">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="newPass" placeholder="password">
+      </div>
+      <label class="check-label"><input type="checkbox" id="newAdmin"> Admin</label>
+      <label class="check-label"><input type="checkbox" id="newWrite"> Write</label>
+      <button class="btn primary" onclick="addUser()">Add</button>
+    </div>
+    <div class="err" id="addErr"></div>
+    <div class="ok" id="addOk">User added.</div>
+  </div>
+</main>
+
+<!-- Edit modal -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal">
+    <h3 id="editTitle">Edit user</h3>
+    <div class="form-row">
+      <div class="field">
+        <label>New password <span style="color:var(--muted)">(leave blank to keep)</span></label>
+        <input type="password" id="editPass" placeholder="new password">
+      </div>
+      <label class="check-label"><input type="checkbox" id="editAdmin"> Admin</label>
+      <label class="check-label"><input type="checkbox" id="editWrite"> Write</label>
+    </div>
+    <div class="err" id="editErr"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeEdit()">Cancel</button>
+      <button class="btn primary" id="editSaveBtn" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentEditId = null;
+let currentUserId = null;
+
+async function checkAuth() {
+  const res = await fetch('/api/me', { credentials: 'same-origin' });
+  if (!res.ok) { window.location.href = '/'; return; }
+  const d = await res.json();
+  if (!d.is_admin) { window.location.href = '/'; return; }
+  currentUserId = d.id || null;
+  loadUsers();
+}
+
+async function doLogout() {
+  await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+  window.location.href = '/';
+}
+
+async function loadUsers() {
+  const res = await fetch('/api/admin/users', { credentials: 'same-origin' });
+  if (!res.ok) { document.getElementById('userTableBody').innerHTML = '<tr><td colspan="4" style="color:var(--red)">Error loading users</td></tr>'; return; }
+  const users = await res.json();
+  renderTable(users);
+}
+
+function renderTable(users) {
+  const me = currentUserId;
+  document.getElementById('userTableBody').innerHTML = users.map(u => `
+    <tr>
+      <td>${escHtml(u.email)}</td>
+      <td><span class="badge ${u.is_admin ? 'yes' : 'no'}">${u.is_admin ? 'Yes' : 'No'}</span></td>
+      <td><span class="badge ${u.can_write ? 'yes' : 'no'}">${u.can_write ? 'Yes' : 'No'}</span></td>
+      <td>
+        <div class="actions">
+          <button class="btn" onclick="openEdit('${escHtml(u.id)}','${escHtml(u.email)}',${u.is_admin},${u.can_write})">Edit</button>
+          <button class="btn danger" onclick="deleteUser('${escHtml(u.id)}','${escHtml(u.email)}')">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function addUser() {
+  const email = document.getElementById('newEmail').value.trim();
+  const pass  = document.getElementById('newPass').value;
+  const isAdmin = document.getElementById('newAdmin').checked;
+  const canWrite = document.getElementById('newWrite').checked;
+  const errEl = document.getElementById('addErr');
+  const okEl  = document.getElementById('addOk');
+  errEl.style.display = 'none';
+  okEl.style.display  = 'none';
+  if (!email || !pass) { errEl.textContent = 'Email and password required'; errEl.style.display = 'block'; return; }
+  const res = await fetch('/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ email, password: pass, is_admin: isAdmin, can_write: canWrite }),
+  });
+  const d = await res.json();
+  if (res.ok) {
+    okEl.style.display = 'block';
+    document.getElementById('newEmail').value = '';
+    document.getElementById('newPass').value = '';
+    document.getElementById('newAdmin').checked = false;
+    document.getElementById('newWrite').checked = false;
+    loadUsers();
+  } else {
+    errEl.textContent = d.error || 'Error';
+    errEl.style.display = 'block';
+  }
+}
+
+function openEdit(id, email, isAdmin, canWrite) {
+  currentEditId = id;
+  document.getElementById('editTitle').textContent = 'Edit: ' + email;
+  document.getElementById('editPass').value = '';
+  document.getElementById('editAdmin').checked = isAdmin;
+  document.getElementById('editWrite').checked = canWrite;
+  document.getElementById('editErr').style.display = 'none';
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('editModal').classList.remove('open');
+  currentEditId = null;
+}
+
+async function saveEdit() {
+  const pass     = document.getElementById('editPass').value;
+  const isAdmin  = document.getElementById('editAdmin').checked;
+  const canWrite = document.getElementById('editWrite').checked;
+  const errEl    = document.getElementById('editErr');
+  errEl.style.display = 'none';
+  const body = { is_admin: isAdmin, can_write: canWrite };
+  if (pass) body.password = pass;
+  const res = await fetch(`/api/admin/users/${currentEditId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (res.ok) {
+    closeEdit();
+    loadUsers();
+  } else {
+    errEl.textContent = d.error || 'Error';
+    errEl.style.display = 'block';
+  }
+}
+
+async function deleteUser(id, email) {
+  if (!confirm(`Delete ${email}?`)) return;
+  const res = await fetch(`/api/admin/users/${id}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  });
+  const d = await res.json();
+  if (res.ok) {
+    loadUsers();
+  } else {
+    alert(d.error || 'Error deleting user');
+  }
+}
+
+checkAuth();
+</script>
+</body>
+</html>
