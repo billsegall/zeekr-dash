@@ -194,6 +194,11 @@ def index():
     return send_from_directory("static", "index.html")
 
 
+@app.get("/map")
+def map_page():
+    return send_from_directory("static", "map.html")
+
+
 @app.get("/<path:filename>")
 def static_files(filename):
     return send_from_directory("static", filename)
