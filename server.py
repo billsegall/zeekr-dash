@@ -185,6 +185,13 @@ def api_error(msg: str, status: int = 500):
     return jsonify({"error": msg}), status
 
 
+def _invalidate_cache(*fn_names):
+    with _cache_lock:
+        for key in list(_cache.keys()):
+            if key[0] in fn_names:
+                del _cache[key]
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -304,6 +311,116 @@ def route_charge_level():
         status = fetch_status()
         level = status["additionalVehicleStatus"]["electricVehicleStatus"]["chargeLevel"]
         return jsonify({"chargeLevel": level})
+    except (AuthException, ZeekrException) as e:
+        return api_error(str(e))
+
+
+@app.post("/api/control")
+@require_auth
+def route_control():
+    data = request.get_json() or {}
+    action = data.get("action")
+
+    # Static action table: action -> (serviceID, command, setting)
+    _STATIC = {
+        "lock":              ("RDL", "start", {"serviceParameters": [{"key": "door",   "value": "all"}]}),
+        "unlock":            ("RDU", "stop",  {"serviceParameters": [{"key": "door",   "value": "all"}]}),
+        "flash":             ("RHL", "start", {"serviceParameters": [{"key": "rhl",    "value": "light-flash"}]}),
+        "honk":              ("RHL", "start", {"serviceParameters": [{"key": "rhl",    "value": "horn-light-flash"}]}),
+        "charge_start":      ("RCS", "start", {"serviceParameters": [{"key": "rcs.restart",   "value": "1"}]}),
+        "charge_stop":       ("RCS", "stop",  {"serviceParameters": [{"key": "rcs.terminate",  "value": "1"}]}),
+        "windows_open":      ("RWS", "start", {"serviceParameters": [{"key": "target", "value": "window"}]}),
+        "windows_close":     ("RWS", "stop",  {"serviceParameters": [{"key": "target", "value": "window"}]}),
+        "sunshade_open":     ("RWS", "start", {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
+        "sunshade_close":    ("RWS", "stop",  {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
+        "parking_comfort_off": ("PCM", "stop", {"serviceParameters": [{"key": "parking_comfortable", "value": "false"}]}),
+        "defrost_on":        ("ZAF", "start", {"serviceParameters": [{"key": "DF", "value": "true"}, {"key": "DF.level", "value": "2"}]}),
+        "defrost_off":       ("ZAF", "start", {"serviceParameters": [{"key": "DF", "value": "false"}]}),
+        "steer_heat_on":     ("ZAF", "start", {"serviceParameters": [{"key": "SW", "value": "true"}, {"key": "SW.level", "value": "3"}, {"key": "SW.duration", "value": "15"}]}),
+        "steer_heat_off":    ("ZAF", "start", {"serviceParameters": [{"key": "SW", "value": "false"}]}),
+    }
+
+    try:
+        if action == "climate":
+            ac_on = bool(data.get("on", False))
+            if ac_on:
+                temp = str(max(16, min(30, int(data.get("temp", 22)))))
+                dur  = str(max(1,  min(15, int(data.get("duration", 15)))))
+                setting = {"serviceParameters": [
+                    {"key": "AC", "value": "true"},
+                    {"key": "AC.temp",     "value": temp},
+                    {"key": "AC.duration", "value": dur},
+                ]}
+            else:
+                setting = {"serviceParameters": [{"key": "AC", "value": "false"}]}
+            ok = client.do_remote_control(VIN, "start", "ZAF", setting)
+
+        elif action == "charge_limit":
+            limit = int(data.get("limit", 80))
+            limit = round(max(50, min(100, limit)) / 5) * 5
+            setting = {"serviceParameters": [
+                {"key": "soc",          "value": str(limit * 10)},
+                {"key": "rcs.setting",  "value": "1"},
+                {"key": "altCurrent",   "value": "1"},
+            ]}
+            ok = client.do_remote_control(VIN, "start", "RCS", setting)
+
+        elif action == "charge_plan":
+            cmd        = data.get("cmd", "start")
+            start_time = data.get("start_time", "")
+            end_time   = data.get("end_time", "")
+            ok = client.set_charge_plan(VIN, start_time=start_time, end_time=end_time, command=cmd)
+            if ok:
+                _invalidate_cache("fetch_charge_plan")
+            return jsonify({"ok": ok})
+
+        elif action == "travel_plan":
+            cmd            = data.get("cmd", "start")
+            scheduled_time = str(data.get("scheduled_time", ""))
+            ac             = bool(data.get("ac", True))
+            sw             = bool(data.get("sw", False))
+            ok = client.set_travel_plan(
+                VIN,
+                command=cmd,
+                scheduled_time=scheduled_time,
+                ac_preconditioning=ac,
+                steering_wheel_heating=sw,
+            )
+            if ok:
+                _invalidate_cache("fetch_travel_plan")
+            return jsonify({"ok": ok})
+
+        elif action in _STATIC:
+            service_id, command, setting = _STATIC[action]
+            ok = client.do_remote_control(VIN, command, service_id, setting)
+
+        elif action == "_raw":
+            service_id = data.get("serviceId", "")
+            command    = data.get("command", "start")
+            setting    = data.get("setting", {})
+            if not service_id:
+                return api_error("serviceId required", 400)
+            from zeekr_ev_api import network, const
+            import json as _json
+            extra_header = {"X-VIN": client._get_encrypted_vin(VIN)}
+            body = {"command": command, "serviceId": service_id, "setting": setting}
+            endpoint = const.CHARGE_CONTROL_URL if service_id == "RCS" else const.REMOTECONTROL_URL
+            resp = network.appSignedPost(
+                client,
+                f"{client.region_login_server}{endpoint}",
+                _json.dumps(body, separators=(",", ":")),
+                extra_headers=extra_header,
+            )
+            log.info("_raw control response: %s", resp)
+            return jsonify({"ok": resp.get("success", False), "raw": resp})
+
+        else:
+            return api_error("Unknown action", 400)
+
+        if ok:
+            _invalidate_cache("fetch_status", "fetch_charging_status", "fetch_charging_limit", "fetch_modes")
+        return jsonify({"ok": ok})
+
     except (AuthException, ZeekrException) as e:
         return api_error(str(e))
 

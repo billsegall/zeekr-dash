@@ -403,6 +403,47 @@ header {
   filter: drop-shadow(0 0 4px rgba(0,0,0,0.5));
   pointer-events: none;
 }
+
+/* ---- Controls ---- */
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.ctrl-btn {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.ctrl-btn:hover:not(:disabled) { background: var(--border); }
+.ctrl-btn:disabled { opacity: .45; cursor: default; }
+.ctrl-btn.danger { border-color: rgba(239,68,68,.4); }
+.ctrl-btn.danger:hover:not(:disabled) { background: rgba(239,68,68,.12); color: var(--red); }
+.ctrl-btn.ok { border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.08); color: var(--green); }
+.ctrl-btn.err { border-color: rgba(239,68,68,.4); background: rgba(239,68,68,.08); color: var(--red); }
+.ctrl-spacer { flex: 1; }
+.ctrl-input {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  font-family: monospace;
+}
+.ctrl-input:focus { border-color: var(--blue); }
+.ctrl-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -487,6 +528,10 @@ header {
             <span class="stat-label">12V</span>
             <span class="stat-val" id="batt12v">—</span>
           </div>
+          <div class="stat-row">
+            <span class="stat-label">Avg use</span>
+            <span class="stat-val" id="battAvgConsumption">—</span>
+          </div>
         </div>
       </div>
     </div>
@@ -504,22 +549,62 @@ header {
         <span class="stat-label">Park brake</span>
         <span id="parkBrake">—</span>
       </div>
+      <div class="ctrl-row">
+        <button class="ctrl-btn" onclick="sendControl(this,'lock')">🔒 Lock</button>
+        <button class="ctrl-btn danger" onclick="confirmCtrl(this,'Unlock the car?','unlock')">🔓 Unlock</button>
+        <div class="ctrl-spacer"></div>
+        <button class="ctrl-btn" onclick="sendControl(this,'flash')">💡 Flash</button>
+        <button class="ctrl-btn" onclick="sendControl(this,'honk')">📯 Honk</button>
+      </div>
     </div>
+  </div>
+
+  <!-- Map -->
+  <div class="card col-12" id="cardMap">
+    <div class="card-header">
+      <span class="icon">📍</span> Location
+      <span style="margin-left:auto;font-size:10px;color:var(--muted)" id="mapAlt">—</span>
+      <span style="font-size:10px;margin-left:12px" id="mapCoords">—</span>
+    </div>
+    <div id="map"></div>
   </div>
 
   <!-- Climate -->
   <div class="card col-4" id="cardClimate">
     <div class="card-header"><span class="icon">🌡</span> Climate</div>
     <div id="climateDiagram" style="display:flex;justify-content:center;padding:10px 0"></div>
-  </div>
-
-  <!-- Map -->
-  <div class="card col-8" id="cardMap">
-    <div class="card-header">
-      <span class="icon">📍</span> Location
-      <span style="margin-left:auto;font-size:10px" id="mapCoords">—</span>
+    <div id="fragStatus" style="padding:0 14px 6px;font-size:11px;color:var(--muted)"></div>
+    <div class="ctrl-row" style="padding:10px 14px;margin-top:0;border-top:1px solid var(--border)">
+      <input id="acTempInput" class="ctrl-input" type="number" min="16" max="30" value="22" style="width:46px">
+      <span class="ctrl-label">°C</span>
+      <button class="ctrl-btn" onclick="setClimate(this,true)">❄ AC On</button>
+      <button class="ctrl-btn" onclick="setClimate(this,false)">AC Off</button>
+      <div class="ctrl-spacer"></div>
+      <button class="ctrl-btn" onclick="sendControl(this,'defrost_on')">🌡 Defrost</button>
     </div>
-    <div id="map"></div>
+    <div class="ctrl-row" style="padding:0 14px 12px;margin-top:0;border-top:none">
+      <span class="ctrl-label">Windows</span>
+      <button class="ctrl-btn" onclick="sendControl(this,'windows_open')">Open</button>
+      <button class="ctrl-btn" onclick="sendControl(this,'windows_close')">Close</button>
+      <div class="ctrl-spacer"></div>
+      <span class="ctrl-label">Shade</span>
+      <button class="ctrl-btn" onclick="sendControl(this,'sunshade_open')">Open</button>
+      <button class="ctrl-btn" onclick="sendControl(this,'sunshade_close')">Close</button>
+    </div>
+    <div class="ctrl-row" style="padding:0 14px 12px;margin-top:0;border-top:1px solid var(--border);flex-direction:column;align-items:stretch;gap:6px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Depart At</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <input id="departTimeInput" class="ctrl-input" type="time" value="08:00">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="departAc" checked> AC
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="departSw"> Steer heat
+        </label>
+        <button class="ctrl-btn" onclick="setTravelPlan(this)">Set</button>
+        <button class="ctrl-btn danger" onclick="clearTravelPlan(this)">Clear</button>
+      </div>
+    </div>
   </div>
 
   <!-- Doors -->
@@ -566,6 +651,25 @@ header {
           <div style="font-family:monospace;font-weight:600;font-size:15px" id="planTime">—</div>
         </div>
         <span id="planActive">—</span>
+      </div>
+      <div class="ctrl-row">
+        <button class="ctrl-btn" onclick="sendControl(this,'charge_start')">▶ Start</button>
+        <button class="ctrl-btn" onclick="sendControl(this,'charge_stop')">⏹ Stop</button>
+        <div class="ctrl-spacer"></div>
+        <span class="ctrl-label">Limit</span>
+        <input id="chargeLimitInput" class="ctrl-input" type="number" min="50" max="100" step="5" value="80" style="width:54px">
+        <span class="ctrl-label">%</span>
+        <button class="ctrl-btn" onclick="setChargeLimit(this)">Set</button>
+      </div>
+      <div class="ctrl-row" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Charge Schedule</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <input id="planStartInput" class="ctrl-input" type="time" value="01:00">
+          <span class="ctrl-label">→</span>
+          <input id="planEndInput" class="ctrl-input" type="time" value="06:00">
+          <button class="ctrl-btn" onclick="setChargePlan(this)">Set</button>
+          <button class="ctrl-btn danger" onclick="clearChargePlan(this)">Clear</button>
+        </div>
       </div>
     </div>
   </div>
@@ -735,9 +839,11 @@ function initMap() {
   carMarker = L.marker([0, 0], { icon: carIcon });
 }
 
-async function updateMapPosition(lat, lng) {
+async function updateMapPosition(lat, lng, alt) {
   if (!lat || !lng) return;
   const ll = [parseFloat(lat), parseFloat(lng)];
+  const altM = parseInt(alt);
+  document.getElementById('mapAlt').textContent = isNaN(altM) ? '' : altM + 'm';
   carMarker.setLatLng(ll).addTo(map);
   map.setView(ll);
   const mapsUrl = `https://www.google.com/maps?q=${ll[0]},${ll[1]}`;
@@ -825,7 +931,7 @@ function renderBattery(ev, maint, chargingLimit) {
   const range = parseInt(ev.distanceToEmptyOnBatteryOnly) || 0;
 
   document.getElementById('battPct').textContent = pct.toFixed(0);
-  document.getElementById('battRange').textContent = range + ' km';
+  document.getElementById('battRange').textContent = range + ' km (' + pct.toFixed(0) + '%)';
   document.getElementById('battPlug').innerHTML =
     ev.isPluggedIn ? badge('Plugged in', 'blue') : badge('Unplugged');
   document.getElementById('battState').innerHTML =
@@ -835,9 +941,16 @@ function renderBattery(ev, maint, chargingLimit) {
   const socRaw = parseInt(chargingLimit?.soc);
   const socPct = !isNaN(socRaw) && socRaw > 100 ? (socRaw / 10).toFixed(1) + '%' : socRaw + '%';
   document.getElementById('battTarget').textContent = socPct + ' limit';
+  if (!isNaN(socRaw)) {
+    const socVal = socRaw > 100 ? Math.round(socRaw / 10) : socRaw;
+    document.getElementById('chargeLimitInput').value = Math.round(socVal / 5) * 5;
+  }
 
   const volt12 = maint?.mainBatteryStatus?.voltage;
   document.getElementById('batt12v').textContent = volt12 ? volt12.toFixed(2) + ' V' : '—';
+
+  const avgCons = parseFloat(ev.averPowerConsumption);
+  document.getElementById('battAvgConsumption').textContent = isNaN(avgCons) ? '—' : avgCons.toFixed(1) + ' kWh/100km';
 
   // arc: circumference of r=14 circle = 2π×14 ≈ 87.96
   const circ = 87.96;
@@ -910,6 +1023,12 @@ function renderClimate(c) {
       <text x="424" y="690" text-anchor="middle" font-size="22" fill="${vc(rrV)}" font-family="system-ui,sans-serif">💨${rrV > 0 ? rrV : '–'}</text>
     </svg>
   </div>`;
+
+  const frags = c.fragStrs?.items?.elements || [];
+  const activeFrags = frags.filter(f => f.activated);
+  document.getElementById('fragStatus').textContent = activeFrags.length
+    ? '🌸 Fragrance: ' + activeFrags.map(f => `Slot ${f.id} Lv${f.level}`).join(', ')
+    : '🌸 Fragrance: Off';
 }
 
 function renderDoors(d) {
@@ -976,6 +1095,8 @@ function renderCharging(chStatus, chLimit, chPlan, ev) {
       (chPlan.startTime || '—') + ' → ' + (chPlan.endTime || '—');
     document.getElementById('planActive').innerHTML =
       chPlan.command === 'start' ? badge('Active', 'green') : badge('Inactive');
+    if (chPlan.startTime) document.getElementById('planStartInput').value = chPlan.startTime;
+    if (chPlan.endTime)   document.getElementById('planEndInput').value   = chPlan.endTime;
   }
 }
 
@@ -1016,23 +1137,26 @@ function renderMaintenance(m) {
 
 function renderModes(m) {
   const modes = [
-    { key: 'gpsstate',           label: 'GPS Tracking',      active: m.gpsstate === '1' },
-    { key: 'journalLogState',    label: 'Journey Logging',   active: m.journalLogState === '1' },
-    { key: 'parkingComfortState',label: 'Parking Comfort',   active: m.parkingComfortState === '1' },
-    { key: 'campingModeState',   label: 'Camp Mode',         active: m.campingModeState === '1' },
-    { key: 'overheatState',      label: 'Overheat Guard',    active: m.overheatState === '1' },
-    { key: 'washCarModeState',   label: 'Car Wash Mode',     active: m.washCarModeState === '1' },
-    { key: 'panicState',         label: 'Panic Alarm',       active: m.panicState === '1' },
-    { key: 'visitorModeState',   label: 'Visitor Mode',      active: m.visitorModeState === '1' },
-    { key: 'privacyMode',        label: `Privacy (raw:${m.privacyMode})`, active: m.privacyMode !== '0' },
-    { key: 'liveDetectionState', label: `Live Detect (raw:${m.liveDetectionState})`, active: m.liveDetectionState !== '0' },
+    { key: 'gpsstate',           label: 'GPS Tracking',    active: m.gpsstate === '1' },
+    { key: 'journalLogState',    label: 'Journey Logging', active: m.journalLogState === '1' },
+    { key: 'parkingComfortState',label: 'Parking Comfort', active: m.parkingComfortState === '1', offAction: 'parking_comfort_off' },
+    { key: 'campingModeState',   label: 'Camp Mode',       active: m.campingModeState === '1' },
+    { key: 'overheatState',      label: 'Overheat Guard',  active: m.overheatState === '1' },
+    { key: 'washCarModeState',   label: 'Car Wash Mode',   active: m.washCarModeState === '1' },
+    { key: 'panicState',         label: 'Panic Alarm',     active: m.panicState === '1' },
+    { key: 'visitorModeState',   label: 'Visitor Mode',    active: m.visitorModeState === '1' },
+    { key: 'privacyMode',        label: `Privacy Mode`,    active: m.privacyMode !== '0' },
+    { key: 'liveDetectionState', label: `Live Detection`,  active: m.liveDetectionState !== '0' },
   ];
-  document.getElementById('modesGrid').innerHTML = modes.map(mode => `
-    <div class="mode-pill ${mode.active ? 'active' : ''}">
+  document.getElementById('modesGrid').innerHTML = modes.map(mode => {
+    const offBtn = mode.offAction && mode.active
+      ? ` <button class="ctrl-btn danger" style="padding:2px 7px;font-size:11px;margin-left:4px" onclick="event.stopPropagation();sendControl(this,'${mode.offAction}')">×</button>`
+      : '';
+    return `<div class="mode-pill ${mode.active ? 'active' : ''}" style="align-items:center">
       <div class="mode-dot"></div>
-      ${mode.label}
-    </div>
-  `).join('');
+      ${mode.label}${offBtn}
+    </div>`;
+  }).join('');
 }
 
 function renderTrips(data) {
@@ -1243,6 +1367,87 @@ function selectTrip(row, idx) {
 }
 
 // ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+async function sendControl(btn, action, params = {}) {
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  btn.className = btn.className.replace(/ ?(ok|err)/g, '');
+  try {
+    const res = await fetch('/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ action, ...params }),
+    });
+    if (res.status === 401) { showLoginOverlay(); return; }
+    let d;
+    try { d = await res.json(); } catch (_) { d = { ok: false, error: `HTTP ${res.status}` }; }
+    if (d.ok) {
+      btn.textContent = '✓';
+      btn.classList.add('ok');
+      setTimeout(refresh, 3000);
+    } else {
+      btn.textContent = '✗ ' + (d.error || 'Failed');
+      btn.classList.add('err');
+    }
+  } catch (e) {
+    btn.textContent = '✗ Network error';
+    btn.classList.add('err');
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => {
+      btn.textContent = origText;
+      btn.className = btn.className.replace(/ ?(ok|err)/g, '');
+    }, 3000);
+  }
+}
+
+function confirmCtrl(btn, msg, action, params = {}) {
+  if (!confirm(msg)) return;
+  sendControl(btn, action, params);
+}
+
+function setChargeLimit(btn) {
+  const limit = parseInt(document.getElementById('chargeLimitInput').value);
+  if (isNaN(limit) || limit < 50 || limit > 100) { alert('Limit must be 50–100'); return; }
+  sendControl(btn, 'charge_limit', { limit });
+}
+
+function setChargePlan(btn) {
+  const start = document.getElementById('planStartInput').value;
+  const end   = document.getElementById('planEndInput').value;
+  if (!start || !end) { alert('Enter start and end times'); return; }
+  sendControl(btn, 'charge_plan', { cmd: 'start', start_time: start, end_time: end });
+}
+
+function clearChargePlan(btn) {
+  sendControl(btn, 'charge_plan', { cmd: 'stop', start_time: '', end_time: '' });
+}
+
+function setClimate(btn, on) {
+  const temp = parseInt(document.getElementById('acTempInput').value) || 22;
+  sendControl(btn, 'climate', { on, temp, duration: 15 });
+}
+
+function setTravelPlan(btn) {
+  const timeStr = document.getElementById('departTimeInput').value;
+  if (!timeStr) { alert('Enter departure time'); return; }
+  const [h, m] = timeStr.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  if (d < new Date()) d.setDate(d.getDate() + 1);
+  const ac = document.getElementById('departAc').checked;
+  const sw = document.getElementById('departSw').checked;
+  sendControl(btn, 'travel_plan', { cmd: 'start', scheduled_time: d.getTime(), ac, sw });
+}
+
+function clearTravelPlan(btn) {
+  sendControl(btn, 'travel_plan', { cmd: 'stop', scheduled_time: 0, ac: false, sw: false });
+}
+
+// ---------------------------------------------------------------------------
 // Data fetch
 // ---------------------------------------------------------------------------
 async function fetchAll() {
@@ -1279,7 +1484,7 @@ async function refresh() {
     renderMaintenance(maint);
     renderModes(all.modes);
     renderTrips(trips);
-    updateMapPosition(pos.latitude, pos.longitude);
+    updateMapPosition(pos.latitude, pos.longitude, pos.altitude);
 
     document.getElementById('headerVin').textContent = all.vin;
     document.getElementById('lastUpdated').textContent =
