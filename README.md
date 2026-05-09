@@ -2,7 +2,9 @@
 
 A self-hosted web dashboard for Zeekr EVs. Displays real-time vehicle status and provides remote controls — lock/unlock, climate, charging, windows, and more — from any browser on your local network.
 
-![Dashboard screenshot](docs/screenshot-dashboard.png)
+![Battery and security cards](docs/screenshot-1.png)
+![Climate and doors cards with car diagram](docs/screenshot-2.png)
+![Charging and maintenance cards](docs/screenshot-3.png)
 
 ## Features
 
