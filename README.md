@@ -37,6 +37,8 @@ The Zeekr app signs API requests using secrets embedded in the Android APK (HMAC
 
 Once you have the secrets, the [`zeekr_ev_api`](https://github.com/Fryyyyy/zeekr_ev_api) library handles authentication and API calls. This project wraps it in a Flask server with a single-page dashboard UI.
 
+The key extraction tool is maintained separately at [`wysie/zeekr_key_extractor`](https://github.com/wysie/zeekr_key_extractor).
+
 ---
 
 ## Prerequisites
@@ -94,7 +96,7 @@ cp zeekr_secrets.json ..
 cd ..
 ```
 
-For EU, add `--region EU`. See [`zeekr_key_extractor/README.md`](zeekr_key_extractor/README.md) for details on regions and troubleshooting.
+For EU, add `--region EU`. See the [`zeekr_key_extractor` README](https://github.com/wysie/zeekr_key_extractor) for details on regions and troubleshooting.
 
 This produces `zeekr_secrets.json` in the project root with the 6 required API secrets.
 
@@ -268,6 +270,7 @@ Navigate to `/admin` (admin users only).
 
 ## Acknowledgements
 
+- [wysie](https://github.com/wysie) for [`zeekr_key_extractor`](https://github.com/wysie/zeekr_key_extractor)
 - [Fryyyyy](https://github.com/Fryyyyy) for [`zeekr_homeassistant`](https://github.com/Fryyyyy/zeekr_homeassistant) and [`zeekr_ev_api`](https://github.com/Fryyyyy/zeekr_ev_api)
 - [Capstone](https://www.capstone-engine.org/) and [pyelftools](https://github.com/eliben/pyelftools) used by the key extractor
 
