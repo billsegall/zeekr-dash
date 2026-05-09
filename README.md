@@ -35,11 +35,9 @@ A self-hosted web dashboard for Zeekr EVs. Displays real-time vehicle status and
 
 ## How it works
 
-The Zeekr app signs API requests using secrets embedded in the Android APK (HMAC keys, an RSA public key for password encryption, and an AES key/IV for VIN encryption). This project uses a companion tool — `zeekr_key_extractor` — to extract those secrets from the APK automatically, without needing to reverse-engineer anything manually.
+The Zeekr app signs API requests using secrets embedded in the Android APK (HMAC keys, an RSA public key for password encryption, and an AES key/IV for VIN encryption). This project uses a companion tool —  [`wysie/zeekr_key_extractor`](https://github.com/wysie/zeekr_key_extractor) — to extract those secrets from the APK automatically, without needing to reverse-engineer anything manually.
 
 Once you have the secrets, the [`zeekr_ev_api`](https://github.com/Fryyyyy/zeekr_ev_api) library handles authentication and API calls. This project wraps it in a Flask server with a single-page dashboard UI.
-
-The key extraction tool is maintained separately at [`wysie/zeekr_key_extractor`](https://github.com/wysie/zeekr_key_extractor).
 
 ---
 
