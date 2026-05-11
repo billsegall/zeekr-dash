@@ -419,7 +419,7 @@ def route_control():
         "windows_close":     (ZEEKR_SERVICEID_RWS, "stop",  {"serviceParameters": [{"key": "target", "value": "window"}]}),
         "sunshade_open":     (ZEEKR_SERVICEID_RWS, "start", {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
         "sunshade_close":    (ZEEKR_SERVICEID_RWS, "stop",  {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
-        "boot_open":              (ZEEKR_SERVICEID_RDU_2, "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
+        "boot_open":              (ZEEKR_SERVICEID_RDU,   "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
         "boot_close":             (ZEEKR_SERVICEID_RDL_2, "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
         "frunk_unlock":           (ZEEKR_SERVICEID_RDU,   "start", {"serviceParameters": [{"key": "target", "value": "hood"}]}),
         "charge_lid_ac_open":     (ZEEKR_SERVICEID_RDO,   "start", {"serviceParameters": [{"key": "target", "value": "front-charge-lid"}]}),
