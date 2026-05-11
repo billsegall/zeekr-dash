@@ -16,6 +16,16 @@ from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from consts import (
+    ZEEKR_SERVICEID_PCM,
+    ZEEKR_SERVICEID_RCS,
+    ZEEKR_SERVICEID_RDL,
+    ZEEKR_SERVICEID_RDU,
+    ZEEKR_SERVICEID_RHL,
+    ZEEKR_SERVICEID_RSM,
+    ZEEKR_SERVICEID_RWS,
+    ZEEKR_SERVICEID_ZAF,
+)
 from zeekr_ev_api import ZeekrClient
 from zeekr_ev_api.exceptions import AuthException, ZeekrException
 
@@ -395,25 +405,25 @@ def route_control():
 
     # Static action table: action -> (serviceID, command, setting)
     _STATIC = {
-        "lock":              ("RDL", "start", {"serviceParameters": [{"key": "door",   "value": "all"}]}),
-        "unlock":            ("RDU", "stop",  {"serviceParameters": [{"key": "door",   "value": "all"}]}),
-        "flash":             ("RHL", "start", {"serviceParameters": [{"key": "rhl",    "value": "light-flash"}]}),
-        "honk":              ("RHL", "start", {"serviceParameters": [{"key": "rhl",    "value": "horn-light-flash"}]}),
-        "charge_start":      ("RCS", "start", {"serviceParameters": [{"key": "rcs.restart",   "value": "1"}]}),
-        "charge_stop":       ("RCS", "stop",  {"serviceParameters": [{"key": "rcs.terminate",  "value": "1"}]}),
-        "windows_open":      ("RWS", "start", {"serviceParameters": [{"key": "target", "value": "window"}]}),
-        "windows_close":     ("RWS", "stop",  {"serviceParameters": [{"key": "target", "value": "window"}]}),
-        "sunshade_open":     ("RWS", "start", {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
-        "sunshade_close":    ("RWS", "stop",  {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
-        "boot_open":         ("RDO", "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
-        "boot_close":        ("RDO", "stop",  {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
-        "frunk_unlock":      ("RDO", "start", {"serviceParameters": [{"key": "target", "value": "hood"}]}),
-        "parking_comfort_off": ("PCM", "stop", {"serviceParameters": [{"key": "parking_comfortable", "value": "false"}]}),
-        "live_detection_off":  ("RSM", "stop", {"serviceParameters": [{"key": "rsm", "value": "6"}]}),
-        "defrost_on":        ("ZAF", "start", {"serviceParameters": [{"key": "DF", "value": "true"}, {"key": "DF.level", "value": "2"}]}),
-        "defrost_off":       ("ZAF", "start", {"serviceParameters": [{"key": "DF", "value": "false"}]}),
-        "steer_heat_on":     ("ZAF", "start", {"serviceParameters": [{"key": "SW", "value": "true"}, {"key": "SW.level", "value": "3"}, {"key": "SW.duration", "value": "15"}]}),
-        "steer_heat_off":    ("ZAF", "start", {"serviceParameters": [{"key": "SW", "value": "false"}]}),
+        "lock":              (ZEEKR_SERVICEID_RDL, "start", {"serviceParameters": [{"key": "door",   "value": "all"}]}),
+        "unlock":            (ZEEKR_SERVICEID_RDU, "stop",  {"serviceParameters": [{"key": "door",   "value": "all"}]}),
+        "flash":             (ZEEKR_SERVICEID_RHL, "start", {"serviceParameters": [{"key": "rhl",    "value": "light-flash"}]}),
+        "honk":              (ZEEKR_SERVICEID_RHL, "start", {"serviceParameters": [{"key": "rhl",    "value": "horn-light-flash"}]}),
+        "charge_start":      (ZEEKR_SERVICEID_RCS, "start", {"serviceParameters": [{"key": "rcs.restart",   "value": "1"}]}),
+        "charge_stop":       (ZEEKR_SERVICEID_RCS, "stop",  {"serviceParameters": [{"key": "rcs.terminate",  "value": "1"}]}),
+        "windows_open":      (ZEEKR_SERVICEID_RWS, "start", {"serviceParameters": [{"key": "target", "value": "window"}]}),
+        "windows_close":     (ZEEKR_SERVICEID_RWS, "stop",  {"serviceParameters": [{"key": "target", "value": "window"}]}),
+        "sunshade_open":     (ZEEKR_SERVICEID_RWS, "start", {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
+        "sunshade_close":    (ZEEKR_SERVICEID_RWS, "stop",  {"serviceParameters": [{"key": "target", "value": "sunshade"}]}),
+        "boot_open":         (ZEEKR_SERVICEID_RDU, "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
+        "boot_close":        (ZEEKR_SERVICEID_RDL, "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
+        "frunk_unlock":      (ZEEKR_SERVICEID_RDU, "start", {"serviceParameters": [{"key": "target", "value": "hood"}]}),
+        "parking_comfort_off": (ZEEKR_SERVICEID_PCM, "stop", {"serviceParameters": [{"key": "parking_comfortable", "value": "false"}]}),
+        "live_detection_off":  (ZEEKR_SERVICEID_RSM, "stop", {"serviceParameters": [{"key": "rsm", "value": "6"}]}),
+        "defrost_on":        (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "DF", "value": "true"}, {"key": "DF.level", "value": "2"}]}),
+        "defrost_off":       (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "DF", "value": "false"}]}),
+        "steer_heat_on":     (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "SW", "value": "true"}, {"key": "SW.level", "value": "3"}, {"key": "SW.duration", "value": "15"}]}),
+        "steer_heat_off":    (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "SW", "value": "false"}]}),
     }
 
     try:
@@ -429,7 +439,7 @@ def route_control():
                 ]}
             else:
                 setting = {"serviceParameters": [{"key": "AC", "value": "false"}]}
-            ok = client.do_remote_control(VIN, "start", "ZAF", setting)
+            ok = client.do_remote_control(VIN, "start", ZEEKR_SERVICEID_ZAF, setting)
 
         elif action == "charge_limit":
             limit = int(data.get("limit", 80))
@@ -439,7 +449,7 @@ def route_control():
                 {"key": "rcs.setting",  "value": "1"},
                 {"key": "altCurrent",   "value": "1"},
             ]}
-            ok = client.do_remote_control(VIN, "start", "RCS", setting)
+            ok = client.do_remote_control(VIN, "start", ZEEKR_SERVICEID_RCS, setting)
 
         elif action == "charge_plan":
             cmd        = data.get("cmd", "start")
