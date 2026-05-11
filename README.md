@@ -243,8 +243,10 @@ POST `/api/control` with `{"action": "<name>", ...}`:
 | `charge_plan` | `cmd`, `start_time`, `end_time` | Scheduled charging |
 | `travel_plan` | `cmd`, `scheduled_time`, `ac`, `sw` | Depart At plan |
 | `boot_open` | — | Tailgate open |
-| `boot_close` | — | Tailgate close (unconfirmed) |
+| `boot_close` | — | Tailgate close |
 | `frunk_unlock` | — | Frunk latch release |
+| `charge_lid_ac_open` / `charge_lid_ac_close` | — | AC charge port lid |
+| `charge_lid_dc_open` / `charge_lid_dc_close` | — | DC charge port lid |
 | `parking_comfort_off` | — | Disable parking comfort mode |
 | `live_detection_off` | — | Disable live detection |
 
@@ -263,7 +265,7 @@ Navigate to `/admin` (admin users only).
 
 ## Known limitations
 
-**Tailgate close:** `frunk_unlock` and `boot_open` are confirmed working. `boot_close` (`RDL` with `target=trunk`) sends successfully but does not close the tailgate — the correct serviceID or parameters are unknown.
+**Tailgate close:** `frunk_unlock` and `boot_open` are confirmed working. `boot_close` updated to use `RDL_2` (was incorrectly `RDL`) — serviceID confirmed via APK decompilation.
 
 **Mode toggles (read-only):** Eight modes show current state but have no off button because the correct serviceIDs are unknown: GPS Tracking, Journey Logging, Camp Mode, Overheat Guard, Car Wash Mode, Panic Alarm, Visitor Mode, Privacy Mode.
 
