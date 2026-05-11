@@ -96,17 +96,17 @@ def _load_secrets() -> dict:
 def _build_client() -> ZeekrClient:
     secrets = _load_secrets()
 
-    if SESSION_FILE.exists():
-        with open(SESSION_FILE) as f:
-            session = json.load(f)
-        log.info("Resuming session from %s", SESSION_FILE.name)
-        return ZeekrClient(session_data=session, **secrets)
-
     from dotenv import dotenv_values
     env = dotenv_values(ENV_FILE)
     email = env.get("ZEEKR_EMAIL")
     password = env.get("ZEEKR_PASSWORD")
     country_code = env.get("ZEEKR_COUNTRY_CODE", "AU")
+
+    if SESSION_FILE.exists():
+        with open(SESSION_FILE) as f:
+            session = json.load(f)
+        log.info("Resuming session from %s", SESSION_FILE.name)
+        return ZeekrClient(username=email, password=password, session_data=session, **secrets)
 
     if not email or not password:
         raise RuntimeError("No session file and no credentials in .env — run connect.py first")
