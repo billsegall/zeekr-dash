@@ -427,7 +427,7 @@ def route_control():
         "charge_lid_dc_open":     (ZEEKR_SERVICEID_RDO,   "start", {"serviceParameters": [{"key": "target", "value": "back-charge-lid"}]}),
         "charge_lid_dc_close":    (ZEEKR_SERVICEID_RDC,   "stop",  {"serviceParameters": [{"key": "target", "value": "back-charge-lid"}]}),
         "parking_comfort_off": (ZEEKR_SERVICEID_PCM, "stop", {"serviceParameters": [{"key": "parking_comfortable", "value": "false"}]}),
-        "live_detection_off":  (ZEEKR_SERVICEID_RSM, "stop", {"serviceParameters": [{"key": "rsm", "value": "6"}]}),
+        "sentinel_off":        (ZEEKR_SERVICEID_RSM, "stop", {"serviceParameters": [{"key": "rsm", "value": "6"}]}),
         "defrost_on":        (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "DF", "value": "true"}, {"key": "DF.level", "value": "2"}]}),
         "defrost_off":       (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "DF", "value": "false"}]}),
         "steer_heat_on":     (ZEEKR_SERVICEID_ZAF, "start", {"serviceParameters": [{"key": "SW", "value": "true"}, {"key": "SW.level", "value": "3"}, {"key": "SW.duration", "value": "15"}]}),

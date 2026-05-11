@@ -1188,7 +1188,7 @@ function renderModes(m) {
     { key: 'panicState',         label: 'Panic Alarm',     active: m.panicState === '1' },
     { key: 'visitorModeState',   label: 'Visitor Mode',    active: m.visitorModeState === '1' },
     { key: 'privacyMode',        label: `Privacy Mode`,    active: m.privacyMode !== '0' },
-    { key: 'liveDetectionState', label: `Live Detection`,  active: m.liveDetectionState !== '0', offAction: 'live_detection_off' },
+    { key: 'liveDetectionState', label: `Sentinel`,        active: m.liveDetectionState !== '0', offAction: 'sentinel_off' },
   ];
   document.getElementById('modesGrid').innerHTML = modes.map(mode => {
     const offBtn = mode.offAction && mode.active
