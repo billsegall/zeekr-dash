@@ -22,8 +22,8 @@ if [ ! -f "$JADX_JAR" ]; then
         "https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip" \
         -o jadx-dist.zip
     # Extract just the lib/jadx-all.jar (the fat jar with all deps)
-    unzip -jo jadx-dist.zip "lib/jadx-all.jar" -d .
-    mv jadx-all.jar "$JADX_JAR"
+    unzip -jo jadx-dist.zip "lib/jadx-${JADX_VERSION}-all.jar" -d .
+    mv "jadx-${JADX_VERSION}-all.jar" "$JADX_JAR"
     rm jadx-dist.zip
     echo "    jadx downloaded → $JADX_JAR"
 else
