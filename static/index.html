@@ -629,6 +629,15 @@ body.read-only .ctrl-row { display: none !important; }
         <span class="ctrl-label">Frunk</span>
         <button class="ctrl-btn" onclick="confirmCtrl(this,'Unlock frunk?','frunk_unlock')">Unlock</button>
       </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">RDU</span>
+        <button class="ctrl-btn" onclick="sendControl(this,'test_rdu_start')">start</button>
+        <button class="ctrl-btn" onclick="sendControl(this,'test_rdu_stop')">stop</button>
+        <div class="ctrl-spacer"></div>
+        <span class="ctrl-label">RDU_2</span>
+        <button class="ctrl-btn" onclick="sendControl(this,'test_rdu2_start')">start</button>
+        <button class="ctrl-btn" onclick="sendControl(this,'test_rdu2_stop')">stop</button>
+      </div>
     </div>
   </div>
 
