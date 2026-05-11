@@ -637,12 +637,8 @@ body.read-only .ctrl-row { display: none !important; }
     <div class="card-header"><span class="icon">🔌</span> Charging</div>
     <div class="card-body">
       <div class="stat-row">
-        <span class="stat-label">AC port</span>
+        <span class="stat-label">Charging port</span>
         <span id="lidAc">—</span>
-      </div>
-      <div class="stat-row" style="margin-top:6px">
-        <span class="stat-label">DC port</span>
-        <span id="lidDc">—</span>
       </div>
       <div class="charge-live" id="chargeLive">
         <div class="charge-live-item">
@@ -1126,7 +1122,6 @@ function renderDoors(d) {
 
 function renderCharging(chStatus, chLimit, chPlan, ev) {
   document.getElementById('lidAc').innerHTML = lidStatus(ev.chargeLidAcStatus);
-  document.getElementById('lidDc').innerHTML = lidStatus(ev.chargeLidDcAcStatus);
 
   document.getElementById('chargePower').textContent =
     parseFloat(chStatus.chargePower) > 0 ? fmt(chStatus.chargePower, 'kW') : '—';
