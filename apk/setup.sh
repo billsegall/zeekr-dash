@@ -32,7 +32,7 @@ fi
 
 # ── 3. Decompile APK ─────────────────────────────────────────────────────────
 echo "==> Decompiling $APK with jadx (this takes a few minutes)..."
-java -jar "$JADX_JAR" \
+java -cp "$JADX_JAR" jadx.cli.JadxCLI \
     --deobf \
     --show-bad-code \
     --threads-count 4 \
