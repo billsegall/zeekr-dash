@@ -2,6 +2,11 @@
 zeekr_ev_api/
 zeekr_key_extractor/
 
+# APK analysis generated artifacts
+apk/src/
+apk/strings.txt
+apk/jadx.jar
+
 # Project files
 plan
 zeekr_secrets.json
