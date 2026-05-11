@@ -242,7 +242,8 @@ POST `/api/control` with `{"action": "<name>", ...}`:
 | `charge_limit` | `limit` (50–100, rounds to 5%) | Set charge limit |
 | `charge_plan` | `cmd`, `start_time`, `end_time` | Scheduled charging |
 | `travel_plan` | `cmd`, `scheduled_time`, `ac`, `sw` | Depart At plan |
-| `boot_open` / `boot_close` | — | Tailgate |
+| `boot_open` | — | Tailgate open |
+| `boot_close` | — | Tailgate close (unconfirmed) |
 | `frunk_unlock` | — | Frunk latch release |
 | `parking_comfort_off` | — | Disable parking comfort mode |
 | `live_detection_off` | — | Disable live detection |
@@ -262,7 +263,7 @@ Navigate to `/admin` (admin users only).
 
 ## Known limitations
 
-**Tailgate / frunk:** The `boot_open`, `boot_close`, and `frunk_unlock` commands send valid API parameters (Zeekr returns `088500` rather than `037000` for invalid params) but the MQTT delivery to the car fails. The correct API call exists in the official app but has not been captured. To find it, proxy the Zeekr app traffic with mitmproxy or Charles Proxy and capture the request when tapping the tailgate or frunk button.
+**Tailgate close:** `frunk_unlock` and `boot_open` are confirmed working. `boot_close` (`RDL` with `target=trunk`) sends successfully but does not close the tailgate — the correct serviceID or parameters are unknown.
 
 **Mode toggles (read-only):** Eight modes show current state but have no off button because the correct serviceIDs are unknown: GPS Tracking, Journey Logging, Camp Mode, Overheat Guard, Car Wash Mode, Panic Alarm, Visitor Mode, Privacy Mode.
 
