@@ -636,10 +636,6 @@ body.read-only .ctrl-row { display: none !important; }
   <div class="card col-4" id="cardCharging">
     <div class="card-header"><span class="icon">🔌</span> Charging</div>
     <div class="card-body">
-      <div class="stat-row">
-        <span class="stat-label">Charging port</span>
-        <span id="lidAc">—</span>
-      </div>
       <div class="charge-live" id="chargeLive">
         <div class="charge-live-item">
           <div class="cl-label">POWER</div>
@@ -676,6 +672,7 @@ body.read-only .ctrl-row { display: none !important; }
       </div>
       <div class="ctrl-row">
         <span class="ctrl-label">Charging port</span>
+        <span id="lidAc" style="font-size:13px;color:var(--muted);margin-right:4px">—</span>
         <button class="ctrl-btn" onclick="sendControl(this,'charge_lid_ac_open')">Open</button>
         <button class="ctrl-btn" onclick="sendControl(this,'charge_lid_ac_close')">Close</button>
       </div>
