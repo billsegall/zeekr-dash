@@ -48,7 +48,8 @@ grep -r "serviceId" apk/src/sources/
 | `PCM` | Parking Comfort Mode | ✅ working |
 | `RSM` | Remote Sensing Mode | ✅ working |
 | `ZAF` | ZEEKR Air Function (climate, defrost, steering heat) | ✅ working |
-| `RDL` + `target=trunk` | Boot (tailgate) close | ❌ sends OK, car ignores |
+| `RDL_2` + `target=trunk` | Boot (tailgate) close | ❌ accepted, car ignores |
+| `RDU_2` | Boot open (per APK) | ❌ server rejects (037000 parameter incorrect) |
 | charge port open/close | Unknown | ❓ TBD |
 | GPS Tracking toggle | Unknown | ❓ TBD |
 | Journey Logging toggle | Unknown | ❓ TBD |

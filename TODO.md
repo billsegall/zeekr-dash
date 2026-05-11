@@ -2,14 +2,14 @@
 
 ## Testing needed
 
-- **Boot close** (`RDL_2` + `target=trunk`) — was broken before token-refresh fix; untested since. Confirm tailgate closes.
 - **Sentinel on/off** (`RSM` + `rsm=6`) — just added to UI; needs real-world test.
 - **Charging port open/close** (AC lid) — worked ~1/3 of the time before; should be reliable now that `_log` crash is fixed. Confirm.
 
 ## Known broken / unresolved
 
+- **Boot close** — no working remote command. `RDL_2` accepted by API but car ignores it. `RDU_2` rejected outright. Boot close button removed from UI.
 - **DC charge lid** (`RDO`/`RDC` + `target=back-charge-lid`) — buttons hidden from UI but serviceID unconfirmed. DC port may require a different target value or entirely different serviceID.
-- **`RDU_2` rejected by API** — APK uses `RDU_2` for boot open but server returns `037000 parameter is incorrect`. Currently using `RDU` + `target=trunk` which works. Root cause unknown.
+- **`RDU_2` rejected by API** — APK uses `RDU_2` for boot open but server returns `037000 parameter is incorrect`. Root cause unknown.
 
 ## Unknown serviceIDs — mode toggles
 
