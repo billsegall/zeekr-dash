@@ -425,6 +425,8 @@ def route_control():
         "test_rdu_stop":          (ZEEKR_SERVICEID_RDU,   "stop",  {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
         "test_rdu2_start":        (ZEEKR_SERVICEID_RDU_2, "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
         "test_rdu2_stop":         (ZEEKR_SERVICEID_RDU_2, "stop",  {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
+        "test_rdl2_start":        (ZEEKR_SERVICEID_RDL_2, "start", {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
+        "test_rdl2_stop":         (ZEEKR_SERVICEID_RDL_2, "stop",  {"serviceParameters": [{"key": "target", "value": "trunk"}]}),
         "frunk_unlock":           (ZEEKR_SERVICEID_RDU,   "start", {"serviceParameters": [{"key": "target", "value": "hood"}]}),
         "charge_lid_ac_open":     (ZEEKR_SERVICEID_RDO,   "start", {"serviceParameters": [{"key": "target", "value": "front-charge-lid"}]}),
         "charge_lid_ac_close":    (ZEEKR_SERVICEID_RDC,   "stop",  {"serviceParameters": [{"key": "target", "value": "front-charge-lid"}]}),
