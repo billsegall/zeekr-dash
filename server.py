@@ -7,6 +7,7 @@ import logging
 import os
 import secrets
 import time
+from datetime import timedelta
 from functools import wraps
 from pathlib import Path
 from threading import Lock
@@ -47,6 +48,7 @@ API_TOKEN = os.environ.get("API_TOKEN", "")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 CORS(app, supports_credentials=True)
 
 # ---------------------------------------------------------------------------
@@ -292,6 +294,7 @@ def route_login():
     password = data.get("password", "")
     user = _find_user_by_email(email)
     if user and check_password_hash(user["password_hash"], password):
+        session.permanent = True
         session["user_id"] = user["id"]
         session["is_admin"] = user.get("is_admin", False)
         session["can_write"] = user.get("can_write", False)
