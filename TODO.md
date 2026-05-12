@@ -7,9 +7,9 @@
 
 ## Known broken / unresolved
 
-- **Boot close** — no working remote command. `RDL_2` accepted by API but car ignores it. `RDU_2` rejected outright. Boot close button removed from UI.
-- **DC charge lid** (`RDO`/`RDC` + `target=back-charge-lid`) — buttons hidden from UI but serviceID unconfirmed. DC port may require a different target value or entirely different serviceID.
-- **`RDU_2` rejected by API** — APK uses `RDU_2` for boot open but server returns `037000 parameter is incorrect`. Root cause unknown.
+- **Boot powered lift** — APK source confirms `RDU_2 start target=trunk` is the correct command. Server returns `037000 "parameter is incorrect"` for shared accounts. This is an account permission restriction — owner account only. Shared dashboard account cannot trigger it. Boot open button releases the latch only (`RDU start target=trunk`).
+- **Boot close** — `RDL_2 start target=trunk` is accepted by server but car ignores it. No working remote close command exists.
+- **DC charge port** — `RDO`/`RDC` + `target=back-charge-lid` confirmed in APK (`LOCK_BACK_CHARGE_LID`). Has no physical effect — serviceID or target may differ for this vehicle variant.
 
 ## Unknown serviceIDs — mode toggles
 

@@ -22,7 +22,7 @@ A self-hosted web dashboard for Zeekr EVs. Displays real-time vehicle status and
 - Windows and sunshade open/close
 - Charge start/stop, charge limit, charge schedule
 - Depart At (pre-condition before departure)
-- Boot open/close, Frunk unlock
+- Boot latch release, Frunk unlock
 - Parking Comfort off, Live Detection off
 
 **Other**
@@ -242,13 +242,11 @@ POST `/api/control` with `{"action": "<name>", ...}`:
 | `charge_limit` | `limit` (50–100, rounds to 5%) | Set charge limit |
 | `charge_plan` | `cmd`, `start_time`, `end_time` | Scheduled charging |
 | `travel_plan` | `cmd`, `scheduled_time`, `ac`, `sw` | Depart At plan |
-| `boot_open` | — | Tailgate open |
-| `boot_close` | — | Tailgate close |
+| `boot_open` | — | Tailgate latch release |
 | `frunk_unlock` | — | Frunk latch release |
 | `charge_lid_ac_open` / `charge_lid_ac_close` | — | AC charge port lid |
-| `charge_lid_dc_open` / `charge_lid_dc_close` | — | DC charge port lid |
 | `parking_comfort_off` | — | Disable parking comfort mode |
-| `live_detection_off` | — | Disable live detection |
+| `sentinel_on` / `sentinel_off` | — | Sentinel (guard) mode |
 
 ---
 
@@ -265,9 +263,11 @@ Navigate to `/admin` (admin users only).
 
 ## Known limitations
 
-**Tailgate close:** `frunk_unlock` and `boot_open` are confirmed working. `boot_close` updated to use `RDL_2` (was incorrectly `RDL`) — serviceID confirmed via APK decompilation.
+**Tailgate:** `boot_open` releases the latch (pops the boot). Remote powered lift requires serviceID `RDU_2`, which the Zeekr server rejects for shared accounts — only the car owner account can trigger it. The dashboard runs on a dedicated shared account, so powered lift is not available. `boot_close` has no working remote command (`RDL_2` is accepted but the car ignores it).
 
-**Mode toggles (read-only):** Eight modes show current state but have no off button because the correct serviceIDs are unknown: GPS Tracking, Journey Logging, Camp Mode, Overheat Guard, Car Wash Mode, Panic Alarm, Visitor Mode, Privacy Mode.
+**Mode toggles (read-only):** Eight modes show current state but have no control buttons because the correct serviceIDs are unknown: GPS Tracking, Journey Logging, Camp Mode, Overheat Guard, Car Wash Mode, Panic Alarm, Visitor Mode, Privacy Mode.
+
+**DC charge port:** `RDO`/`RDC` with `target=back-charge-lid` has no physical effect. ServiceID or target value unconfirmed.
 
 ---
 
