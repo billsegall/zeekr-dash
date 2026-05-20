@@ -42,14 +42,14 @@ grep -r "serviceId" apk/src/sources/
 |----|---------|--------|
 | `RCS` | Remote Charge Service | ✅ working |
 | `RDL` | Remote Door Lock | ✅ working |
-| `RDU` | Remote Door Unlock (also frunk/boot open) | ✅ working |
+| `RDU` | Remote Door Unlock / frunk open / boot latch release | ✅ working |
 | `RHL` | Remote Horn / Light | ✅ working |
 | `RWS` | Remote Window / Sunshade | ✅ working |
 | `PCM` | Parking Comfort Mode | ✅ working |
 | `RSM` | Remote Sensing Mode | ✅ working |
 | `ZAF` | ZEEKR Air Function (climate, defrost, steering heat) | ✅ working |
-| `RDL_2` + `target=trunk` | Boot (tailgate) close | ❌ accepted, car ignores |
-| `RDU_2` | Boot open (per APK) | ❌ server rejects (037000 parameter incorrect) |
+| `RDU_2` + `target=trunk` | Boot powered lift open | ❌ owner account only — server returns `037000 parameter incorrect` for shared accounts |
+| `RDL_2` + `target=trunk` | Boot powered lift close | ❌ owner account only — accepted by server, car ignores; no working remote close exists |
 | `RDO` + `target=front-charge-lid` | AC charge port open | ✅ working |
 | `RDC` + `target=front-charge-lid` | AC charge port close | ✅ working |
 | `RDO` + `target=back-charge-lid` | DC charge port open | ❌ no physical effect — serviceID or target may differ for this variant |
