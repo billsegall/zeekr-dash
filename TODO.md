@@ -3,7 +3,7 @@
 ## Testing needed
 
 - **Sentinel on/off** (`RSM` + `rsm=6`) — just added to UI; needs real-world test.
-- **Charging port open/close** (AC lid) — worked ~1/3 of the time before; should be reliable now that `_log` crash is fixed. Confirm.
+- **Charging port open/close** (AC lid) — worked ~1/3 of the time before; should be reliable now that token-refresh crash is fixed (PR #29 merged). Confirm.
 
 ## Known broken / unresolved
 
@@ -30,7 +30,7 @@ Use `apk/find_patterns.py --pattern "<mode name>"` against decompiled source (`a
 
 ## Upstream zeekr_ev_api
 
-- PR #23 at `Fryyyyy/zeekr_ev_api` — verify it's clean (no debug logging commits) and merge-ready.
+- PR #23 merged (trip pagination fix). PR #29 merged (password included in exported session — fixes token-refresh crash on session reload). Fork `billsegall/zeekr_ev_api` is up to date with upstream.
 
 ## Dashboard improvements
 
