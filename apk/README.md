@@ -50,7 +50,10 @@ grep -r "serviceId" apk/src/sources/
 | `ZAF` | ZEEKR Air Function (climate, defrost, steering heat) | ✅ working |
 | `RDL_2` + `target=trunk` | Boot (tailgate) close | ❌ accepted, car ignores |
 | `RDU_2` | Boot open (per APK) | ❌ server rejects (037000 parameter incorrect) |
-| charge port open/close | Unknown | ❓ TBD |
+| `RDO` + `target=front-charge-lid` | AC charge port open | ✅ working |
+| `RDC` + `target=front-charge-lid` | AC charge port close | ✅ working |
+| `RDO` + `target=back-charge-lid` | DC charge port open | ❌ no physical effect — serviceID or target may differ for this variant |
+| `RDC` + `target=back-charge-lid` | DC charge port close | ❌ no physical effect — serviceID or target may differ for this variant |
 | GPS Tracking toggle | Unknown | ❓ TBD |
 | Journey Logging toggle | Unknown | ❓ TBD |
 | Camp Mode toggle | Unknown | ❓ TBD |
