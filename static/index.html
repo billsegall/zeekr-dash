@@ -164,6 +164,7 @@ body.read-only .ctrl-row { display: none !important; }
 
 /* ---- Map ---- */
 #map { height: 280px; border-radius: 0 0 10px 10px; }
+#tripMapDiv { height: 220px; }
 .leaflet-container { background: #0a111f; }
 
 
@@ -768,6 +769,27 @@ body.read-only .ctrl-row { display: none !important; }
         <tbody id="tripsBody"></tbody>
       </table>
     </div>
+    <div id="tripDetail" style="display:none;border-top:1px solid var(--border)">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;padding:10px 14px;font-size:12px">
+        <div>
+          <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Duration</div>
+          <strong id="tdDuration">—</strong>
+        </div>
+        <div>
+          <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Odometer</div>
+          <strong id="tdOdometer">—</strong>
+        </div>
+        <div style="flex:1;min-width:140px">
+          <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">🟢 Start</div>
+          <span id="tdStart">—</span>
+        </div>
+        <div style="flex:1;min-width:140px">
+          <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">🔴 End</div>
+          <span id="tdEnd">—</span>
+        </div>
+      </div>
+      <div id="tripMapDiv"></div>
+    </div>
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)">
       <button class="refresh-btn" id="tripsPrev" onclick="tripsChangePage(-1)">← Prev</button>
       <span id="tripsPageInfo" style="font-size:12px;color:var(--muted)">—</span>
@@ -857,6 +879,7 @@ let map, carMarker, tripLayers = [];
 let tripsPage = 1;
 const TRIPS_PAGE_SIZE = 20;
 let tripsEndTimeStack = [0]; // endTime to fetch each page; 0 = now (first page)
+let tripDetailMap = null;
 
 // ---------------------------------------------------------------------------
 // Map init
@@ -878,6 +901,18 @@ function initMap() {
   carMarker = L.marker([0, 0], { icon: carIcon });
 }
 
+async function reverseGeocode(lat, lon) {
+  const r = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+    { headers: { 'Accept-Language': 'en' } }
+  );
+  const d = await r.json();
+  const addr = d.address;
+  const street = [addr.house_number, addr.road].filter(Boolean).join(' ');
+  const parts = [street, addr.suburb || addr.town || addr.city].filter(Boolean);
+  return parts.length ? parts.join(', ') : d.display_name.split(',').slice(0, 2).join(',').trim();
+}
+
 async function updateMapPosition(lat, lng, alt) {
   if (!lat || !lng) return;
   const ll = [parseFloat(lat), parseFloat(lng)];
@@ -889,14 +924,7 @@ async function updateMapPosition(lat, lng, alt) {
   const coordsEl = document.getElementById('mapCoords');
   coordsEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${ll[0].toFixed(5)}, ${ll[1].toFixed(5)}</a>`;
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${ll[0]}&lon=${ll[1]}&format=json`, {
-      headers: { 'Accept-Language': 'en' }
-    });
-    const d = await r.json();
-    const addr = d.address;
-    const street = [addr.house_number, addr.road].filter(Boolean).join(' ');
-    const parts = [street, addr.suburb || addr.town || addr.city].filter(Boolean);
-    const label = parts.length ? parts.join(', ') : d.display_name.split(',').slice(0,2).join(',').trim();
+    const label = await reverseGeocode(ll[0], ll[1]);
     coordsEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${label}</a>`;
   } catch (_) {}
 }
@@ -1198,6 +1226,7 @@ function renderModes(m) {
 }
 
 function renderTrips(data) {
+  document.getElementById('tripDetail').style.display = 'none';
   const total = data.total || 0;
   const pages = data.pages || 1;
   document.getElementById('tripsTotal').textContent =
@@ -1401,6 +1430,57 @@ function selectTrip(row, idx) {
   const trip = window._tripsData[idx];
   if (trip?.trackPoints?.length) {
     showTripOnMap(trip.trackPoints);
+  }
+  showTripDetail(trip);
+}
+
+async function showTripDetail(trip) {
+  const detail = document.getElementById('tripDetail');
+  detail.style.display = 'block';
+
+  const durMs = (trip.endTime || 0) - (trip.startTime || 0);
+  const durMin = Math.round(durMs / 60000);
+  document.getElementById('tdDuration').textContent =
+    durMin >= 60 ? `${Math.floor(durMin / 60)}h ${durMin % 60}m` : `${durMin}m`;
+
+  document.getElementById('tdOdometer').textContent =
+    trip.startOdometer != null && trip.endOdometer != null
+      ? `${trip.startOdometer.toLocaleString()} → ${trip.endOdometer.toLocaleString()} km`
+      : '—';
+
+  document.getElementById('tdStart').textContent = '…';
+  document.getElementById('tdEnd').textContent = '…';
+
+  if (tripDetailMap) { tripDetailMap.remove(); tripDetailMap = null; }
+  tripDetailMap = L.map('tripMapDiv', { zoomControl: true, attributionControl: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 })
+    .addTo(tripDetailMap);
+
+  if (trip.trackPoints?.length) {
+    const pts = trip.trackPoints.map(p => [p.latitude, p.longitude]);
+    const line = L.polyline(pts, { color: '#3b82f6', weight: 3, opacity: .8 }).addTo(tripDetailMap);
+    const startIcon = L.divIcon({
+      html: `<div style="width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff"></div>`,
+      className: '', iconAnchor: [5, 5]
+    });
+    const endIcon = L.divIcon({
+      html: `<div style="width:10px;height:10px;background:#ef4444;border-radius:50%;border:2px solid #fff"></div>`,
+      className: '', iconAnchor: [5, 5]
+    });
+    L.marker(pts[0], { icon: startIcon }).addTo(tripDetailMap);
+    L.marker(pts[pts.length - 1], { icon: endIcon }).addTo(tripDetailMap);
+    tripDetailMap.fitBounds(line.getBounds(), { padding: [30, 30] });
+
+    const first = trip.trackPoints[0];
+    const last  = trip.trackPoints[trip.trackPoints.length - 1];
+    reverseGeocode(first.latitude, first.longitude).then(addr => {
+      const el = document.getElementById('tdStart');
+      if (el) el.textContent = addr;
+    }).catch(() => {});
+    reverseGeocode(last.latitude, last.longitude).then(addr => {
+      const el = document.getElementById('tdEnd');
+      if (el) el.textContent = addr;
+    }).catch(() => {});
   }
 }
 
