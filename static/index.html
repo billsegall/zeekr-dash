@@ -1292,15 +1292,18 @@ async function downloadTripsCSV() {
       if (allTrips.length >= (data.total || 0)) break;
       endTime = (data.lastId || 1) - 1;
     }
-    const headers = ['date','startTime','endTime','distanceKm','avgSpeedKmh','consumedWhPerKm','regenWh'];
+    const headers = ['date','startTime','endTime','durationMin','distanceKm','avgSpeedKmh','consumedWhPerKm','regenWh','startOdometerKm','endOdometerKm'];
     const rows = allTrips.map(t => [
       new Date(t.reportTime).toISOString(),
       new Date(t.startTime).toISOString(),
       new Date(t.endTime).toISOString(),
+      t.startTime && t.endTime ? ((t.endTime - t.startTime) / 60000).toFixed(1) : '',
       t.traveledDistance,
       t.avgSpeed,
       t.electricConsumption,
       t.electricRegeneration,
+      t.startOdometer ?? '',
+      t.endOdometer ?? '',
     ]);
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const a = document.createElement('a');
