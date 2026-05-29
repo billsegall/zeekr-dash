@@ -1347,22 +1347,27 @@ async function showStats() {
   const speeds= trips.map(t => parseFloat(t.avgSpeed) || 0);
   const cons  = trips.map(t => parseFloat(t.electricConsumption) || 0).filter(v => v > 0);
   const regens= trips.map(t => parseFloat(t.electricRegeneration) || 0);
+  const durs  = trips.filter(t => t.startTime && t.endTime).map(t => (t.endTime - t.startTime) / 60000);
 
   const sum   = a => a.reduce((s, v) => s + v, 0);
   const avg   = a => a.length ? sum(a) / a.length : 0;
   const min   = a => Math.min(...a);
   const max   = a => Math.max(...a);
 
-  const totalDist  = sum(dists);
-  const avgDist    = avg(dists);
-  const longestIdx = dists.indexOf(max(dists));
-  const longestTrip= trips[longestIdx];
-  const avgCons    = avg(cons);
-  const bestCons   = min(cons);
-  const worstCons  = max(cons);
-  const totalRegen  = sum(regens) / 1000;
-  const totalEnergy = trips.reduce((s, t) => s + (parseFloat(t.electricConsumption) || 0) * (parseFloat(t.traveledDistance) || 0), 0) / 100;
-  const avgSpeed   = avg(speeds);
+  const totalDist    = sum(dists);
+  const avgDist      = avg(dists);
+  const longestIdx   = dists.indexOf(max(dists));
+  const longestTrip  = trips[longestIdx];
+  const avgCons      = avg(cons);
+  const bestCons     = min(cons);
+  const worstCons    = max(cons);
+  const totalRegen   = sum(regens) / 1000;
+  const totalEnergy  = trips.reduce((s, t) => s + (parseFloat(t.electricConsumption) || 0) * (parseFloat(t.traveledDistance) || 0), 0) / 100;
+  const avgSpeed     = avg(speeds);
+  const totalDurH    = sum(durs) / 60;
+  const avgDurMin    = avg(durs);
+  const longestDurMin= durs.length ? max(durs) : 0;
+  const currentOdom  = trips.reduce((best, t) => Math.max(best, t.endOdometer || 0), 0);
 
   // day-of-week distribution
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1412,6 +1417,12 @@ async function showStats() {
     ${statRow('Longest trip', max(dists).toFixed(1) + ' km', new Date(longestTrip.reportTime).toLocaleDateString())}
     ${statRow('Avg speed', avgSpeed.toFixed(1), 'km/h')}
     ${statRow('Busiest day', busiestDay, `(${max(dayCounts)} trips)`)}
+    ${currentOdom ? statRow('Current odometer', currentOdom.toLocaleString(), 'km') : ''}
+
+    ${section('Time')}
+    ${statRow('Total driving time', totalDurH.toFixed(1), 'h')}
+    ${statRow('Avg trip duration', avgDurMin >= 60 ? `${Math.floor(avgDurMin/60)}h ${Math.round(avgDurMin%60)}m` : Math.round(avgDurMin) + 'm', '')}
+    ${statRow('Longest duration', longestDurMin >= 60 ? `${Math.floor(longestDurMin/60)}h ${Math.round(longestDurMin%60)}m` : Math.round(longestDurMin) + 'm', '')}
 
     ${section('Efficiency')}
     ${statRow('Avg consumption', avgCons.toFixed(1), 'kWh/100km')}
