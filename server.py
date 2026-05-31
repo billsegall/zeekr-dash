@@ -7,10 +7,10 @@ import logging
 import os
 import secrets
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Timer
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, session
@@ -135,6 +135,9 @@ log.info("Ready. VIN=%s", VIN)
 _cache: dict = {}
 _cache_lock = Lock()
 
+_charge_timer: Timer | None = None
+_charge_timer_lock = Lock()
+
 
 def ttl_cache(seconds: int):
     def decorator(fn):
@@ -249,6 +252,34 @@ def require_admin(fn):
 
 def api_error(msg: str, status: int = 500):
     return jsonify({"error": msg}), status
+
+
+def _cancel_charge_timer():
+    global _charge_timer
+    with _charge_timer_lock:
+        if _charge_timer is not None:
+            _charge_timer.cancel()
+            _charge_timer = None
+
+
+def _arm_charge_timer(seconds: int):
+    global _charge_timer
+    _cancel_charge_timer()
+    def _fire():
+        global _charge_timer
+        log.info("charge_for timer fired — clearing charge plan")
+        try:
+            client.set_charge_plan(VIN, start_time="", end_time="", command="stop")
+            _invalidate_cache("fetch_charge_plan")
+        except Exception as exc:
+            log.error("charge_for timer: failed to clear plan: %s", exc)
+        with _charge_timer_lock:
+            _charge_timer = None
+    with _charge_timer_lock:
+        _charge_timer = Timer(seconds, _fire)
+        _charge_timer.daemon = True
+        _charge_timer.start()
+    log.info("charge_for timer armed for %ds", seconds)
 
 
 def _invalidate_cache(*fn_names):
@@ -463,6 +494,20 @@ def route_control():
             ]}
             ok = client.do_remote_control(VIN, "start", ZEEKR_SERVICEID_RCS, setting)
 
+        elif action == "charge_for":
+            minutes = int(data.get("minutes", 60))
+            minutes = max(15, min(600, minutes))
+            now = datetime.now()
+            end_dt = now + timedelta(minutes=minutes)
+            pad = lambda n: str(n).zfill(2)
+            start_time = f"{pad(now.hour)}:{pad(now.minute)}"
+            end_time   = f"{pad(end_dt.hour)}:{pad(end_dt.minute)}"
+            ok = client.set_charge_plan(VIN, start_time=start_time, end_time=end_time, command="start")
+            if ok:
+                _invalidate_cache("fetch_charge_plan")
+                _arm_charge_timer(minutes * 60)
+            return jsonify({"ok": ok})
+
         elif action == "charge_plan":
             cmd        = data.get("cmd", "start")
             start_time = data.get("start_time", "")
@@ -470,6 +515,8 @@ def route_control():
             ok = client.set_charge_plan(VIN, start_time=start_time, end_time=end_time, command=cmd)
             if ok:
                 _invalidate_cache("fetch_charge_plan")
+                if cmd == "stop":
+                    _cancel_charge_timer()
             return jsonify({"ok": ok})
 
         elif action == "travel_plan":

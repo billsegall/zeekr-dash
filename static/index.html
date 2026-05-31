@@ -1578,13 +1578,8 @@ function clearChargePlan(btn) {
 }
 
 function chargeForDuration(btn) {
-  const mins = parseInt(document.getElementById('chargeForSelect').value);
-  const now = new Date();
-  const end = new Date(now.getTime() + mins * 60000);
-  const pad = n => String(n).padStart(2, '0');
-  const start_time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  const end_time   = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
-  sendControl(btn, 'charge_plan', { cmd: 'start', start_time, end_time });
+  const minutes = parseInt(document.getElementById('chargeForSelect').value);
+  sendControl(btn, 'charge_for', { minutes });
 }
 
 function setClimate(btn, on) {
