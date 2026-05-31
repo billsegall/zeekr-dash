@@ -676,6 +676,25 @@ body.read-only .ctrl-row { display: none !important; }
         <button class="ctrl-btn" onclick="sendControl(this,'charge_lid_ac_open')">Open</button>
         <button class="ctrl-btn" onclick="sendControl(this,'charge_lid_ac_close')">Close</button>
       </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Charge for</span>
+        <select id="chargeForSelect" class="ctrl-input">
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="45">45 min</option>
+          <option value="60" selected>1 h</option>
+          <option value="75">1 h 15 m</option>
+          <option value="90">1 h 30 m</option>
+          <option value="105">1 h 45 m</option>
+          <option value="120">2 h</option>
+          <option value="150">2 h 30 m</option>
+          <option value="180">3 h</option>
+          <option value="240">4 h</option>
+          <option value="300">5 h</option>
+          <option value="360">6 h</option>
+        </select>
+        <button class="ctrl-btn" onclick="chargeForDuration(this)">Set</button>
+      </div>
       <div class="ctrl-row" style="flex-direction:column;align-items:stretch;gap:6px">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Charge Schedule</div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1556,6 +1575,16 @@ function setChargePlan(btn) {
 
 function clearChargePlan(btn) {
   sendControl(btn, 'charge_plan', { cmd: 'stop', start_time: '', end_time: '' });
+}
+
+function chargeForDuration(btn) {
+  const mins = parseInt(document.getElementById('chargeForSelect').value);
+  const now = new Date();
+  const end = new Date(now.getTime() + mins * 60000);
+  const pad = n => String(n).padStart(2, '0');
+  const start_time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const end_time   = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+  sendControl(btn, 'charge_plan', { cmd: 'start', start_time, end_time });
 }
 
 function setClimate(btn, on) {
