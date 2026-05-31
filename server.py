@@ -271,7 +271,7 @@ def _arm_charge_timer(seconds: int, restore_plan: dict | None):
             if restore_plan and restore_plan.get("startTime") and restore_plan.get("command") == "start":
                 log.info("charge_for timer fired — restoring previous plan %s→%s",
                          restore_plan["startTime"], restore_plan.get("endTime", ""))
-                client.set_charge_plan(
+                restored = client.set_charge_plan(
                     VIN,
                     start_time=restore_plan["startTime"],
                     end_time=restore_plan.get("endTime", ""),
@@ -279,6 +279,7 @@ def _arm_charge_timer(seconds: int, restore_plan: dict | None):
                     bc_cycle_active=restore_plan.get("bcCycleActive", False),
                     bc_temp_active=restore_plan.get("bcTempActive", False),
                 )
+                log.info("charge_for timer: restore result=%s", restored)
             else:
                 log.info("charge_for timer fired — no prior plan, stopping")
                 client.set_charge_plan(VIN, start_time="", end_time="", command="stop")
@@ -509,7 +510,7 @@ def route_control():
         elif action == "charge_for":
             minutes = int(data.get("minutes", 60))
             minutes = max(15, min(600, minutes))
-            prior_plan = fetch_charge_plan()
+            prior_plan = client.get_charge_plan(VIN)
             now = datetime.now()
             end_dt = now + timedelta(minutes=minutes)
             pad = lambda n: str(n).zfill(2)
