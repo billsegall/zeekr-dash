@@ -518,6 +518,8 @@ def route_control():
             ok = client.set_charge_plan(VIN, start_time=start_time, end_time=end_time, command="start")
             if ok:
                 _invalidate_cache("fetch_charge_plan")
+                client.do_remote_control(VIN, "start", ZEEKR_SERVICEID_RCS,
+                    {"serviceParameters": [{"key": "rcs.restart", "value": "1"}]})
                 _arm_charge_timer(minutes * 60, prior_plan)
             return jsonify({"ok": ok})
 
