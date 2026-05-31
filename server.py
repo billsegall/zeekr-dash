@@ -262,17 +262,29 @@ def _cancel_charge_timer():
             _charge_timer = None
 
 
-def _arm_charge_timer(seconds: int):
+def _arm_charge_timer(seconds: int, restore_plan: dict | None):
     global _charge_timer
     _cancel_charge_timer()
     def _fire():
         global _charge_timer
-        log.info("charge_for timer fired — clearing charge plan")
         try:
-            client.set_charge_plan(VIN, start_time="", end_time="", command="stop")
+            if restore_plan and restore_plan.get("startTime") and restore_plan.get("command") == "start":
+                log.info("charge_for timer fired — restoring previous plan %s→%s",
+                         restore_plan["startTime"], restore_plan.get("endTime", ""))
+                client.set_charge_plan(
+                    VIN,
+                    start_time=restore_plan["startTime"],
+                    end_time=restore_plan.get("endTime", ""),
+                    command="start",
+                    bc_cycle_active=restore_plan.get("bcCycleActive", False),
+                    bc_temp_active=restore_plan.get("bcTempActive", False),
+                )
+            else:
+                log.info("charge_for timer fired — no prior plan, stopping")
+                client.set_charge_plan(VIN, start_time="", end_time="", command="stop")
             _invalidate_cache("fetch_charge_plan")
         except Exception as exc:
-            log.error("charge_for timer: failed to clear plan: %s", exc)
+            log.error("charge_for timer: failed to restore plan: %s", exc)
         with _charge_timer_lock:
             _charge_timer = None
     with _charge_timer_lock:
@@ -497,6 +509,7 @@ def route_control():
         elif action == "charge_for":
             minutes = int(data.get("minutes", 60))
             minutes = max(15, min(600, minutes))
+            prior_plan = fetch_charge_plan()
             now = datetime.now()
             end_dt = now + timedelta(minutes=minutes)
             pad = lambda n: str(n).zfill(2)
@@ -505,7 +518,7 @@ def route_control():
             ok = client.set_charge_plan(VIN, start_time=start_time, end_time=end_time, command="start")
             if ok:
                 _invalidate_cache("fetch_charge_plan")
-                _arm_charge_timer(minutes * 60)
+                _arm_charge_timer(minutes * 60, prior_plan)
             return jsonify({"ok": ok})
 
         elif action == "charge_plan":
