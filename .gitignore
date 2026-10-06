@@ -235,3 +235,6 @@ __marimo__/
 
 # Real user records: password hashes + per-user home coordinates.
 users.json
+
+# Proxied map tiles, re-fetched on demand.
+tile_cache/

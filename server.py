@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 from threading import Lock, Timer
 
+import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
@@ -567,6 +568,54 @@ def route_all():
         })
     except (AuthException, ZeekrException) as e:
         return api_error(str(e))
+
+
+# ---------------------------------------------------------------------------
+# Map tiles
+# ---------------------------------------------------------------------------
+# Browsers on this network get 403 "access blocked" and key-required pages
+# straight from the public tile CDNs, while this host fetches the same tiles
+# fine. So tiles are proxied: the page only ever talks to this server. That also
+# lets us send the identifying User-Agent OpenStreetMap's tile usage policy asks
+# for, and the disk cache keeps repeat views off their servers entirely.
+
+TILE_CACHE = Path(__file__).parent / "tile_cache"
+TILE_UPSTREAM = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+TILE_UA = "zeekr-dash/1.0 (+https://github.com/billsegall/zeekr-dash)"
+TILE_MAX_ZOOM = 19
+
+
+@app.get("/tiles/<int:z>/<int:x>/<int:y>.png")
+@require_auth
+def route_tile(z: int, x: int, y: int):
+    # Bounded so the route can't be driven as a general-purpose fetcher; require_auth
+    # keeps it off the open internet in the first place.
+    if z > TILE_MAX_ZOOM or not (0 <= x < 2 ** z) or not (0 <= y < 2 ** z):
+        return api_error("Tile out of range", 404)
+
+    cached = TILE_CACHE / str(z) / str(x) / f"{y}.png"
+    if not cached.exists():
+        try:
+            r = requests.get(
+                TILE_UPSTREAM.format(z=z, x=x, y=y),
+                headers={"User-Agent": TILE_UA},
+                timeout=(5, 15),
+            )
+        except requests.RequestException as exc:
+            log.warning("Tile fetch failed z=%s x=%s y=%s: %s", z, x, y, exc)
+            return api_error("Tile fetch failed", 502)
+        if r.status_code != 200 or not r.headers.get("Content-Type", "").startswith("image/"):
+            log.warning("Tile upstream returned %s for z=%s x=%s y=%s", r.status_code, z, x, y)
+            return api_error("Tile unavailable upstream", 502)
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        # Write via a temp file so a concurrent request never serves a partial tile.
+        tmp = cached.with_name(f"{cached.name}.{os.getpid()}.tmp")
+        tmp.write_bytes(r.content)
+        os.replace(tmp, cached)
+
+    resp = send_from_directory(cached.parent, cached.name, mimetype="image/png")
+    resp.headers["Cache-Control"] = "public, max-age=2592000"  # 30 days
+    return resp
 
 
 @app.get("/api/chargeLevel")
