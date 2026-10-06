@@ -167,6 +167,13 @@ body.read-only .ctrl-row { display: none !important; }
 #map { height: 280px; border-radius: 0 0 10px 10px; }
 #tripMapDiv { height: 220px; }
 .leaflet-container { background: #0a111f; }
+/* OSM only serves light tiles, so invert them to match the dark UI. Scoped to the
+   tile pane so the car marker, trip track and home circle keep their real colours. */
+.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.95) contrast(.9); }
+.leaflet-control-attribution {
+  background: rgba(10,17,31,.7) !important; color: var(--muted) !important; font-size: 10px;
+}
+.leaflet-control-attribution a { color: var(--muted) !important; }
 
 
 /* ---- Climate ---- */
@@ -942,11 +949,12 @@ let tripDetailMap = null;
 // Map init
 // ---------------------------------------------------------------------------
 function initMap() {
-  map = L.map('map', { zoomControl: true, attributionControl: false })
+  map = L.map('map', { zoomControl: true })
     .setView([-27.48, 152.99], 14);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
 
   const carIcon = L.divIcon({
@@ -1406,6 +1414,17 @@ function renderModes(m) {
 
 function renderTrips(data) {
   document.getElementById('tripDetail').style.display = 'none';
+  if (data.error) {
+    document.getElementById('tripsTotal').textContent = '';
+    document.getElementById('tripsPageInfo').textContent = '';
+    document.getElementById('tripsPrev').disabled = true;
+    document.getElementById('tripsNext').disabled = true;
+    document.getElementById('tripsBody').innerHTML =
+      `<tr><td colspan="99" style="padding:18px;color:var(--muted);text-align:center">
+         ⚠️ ${data.error}
+       </td></tr>`;
+    return;
+  }
   const total = data.total || 0;
   const pages = data.pages || 1;
   document.getElementById('tripsTotal').textContent =
@@ -1645,9 +1664,11 @@ async function showTripDetail(trip) {
   document.getElementById('tdEnd').textContent = '…';
 
   if (tripDetailMap) { tripDetailMap.remove(); tripDetailMap = null; }
-  tripDetailMap = L.map('tripMapDiv', { zoomControl: true, attributionControl: false });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 })
-    .addTo(tripDetailMap);
+  tripDetailMap = L.map('tripMapDiv', { zoomControl: true });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(tripDetailMap);
 
   if (trip.trackPoints?.length) {
     const pts = trip.trackPoints.map(p => [p.latitude, p.longitude]);
