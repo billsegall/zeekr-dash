@@ -1,3 +1,16 @@
+# Runtime
 python-dotenv>=1.0.0
 flask>=3.0.0
 flask-cors>=4.0.0
+werkzeug>=3.1.9       # imported directly for password hashing; 3.1.9 fixes safe_join()
+requests>=2.32.5      # notifier.py posts to signal-cli-rest-api
+zeekr_ev_api>=0.1.15  # local dev uses the clone instead: pip install -e ./zeekr_ev_api
+
+# Transitive, floored for known advisories (nothing imports these directly)
+urllib3>=2.8.0        # proxy TLS config ignored; cross-origin header leak; 3x DoS
+idna>=3.15            # DoS via crafted idna.encode() input
+
+# Tests: pytest -q test_monitor.py test_notifier.py test_prefs.py
+# NOTE: test_prefs.py imports server.py, which claims the single Zeekr API
+# session — stop zeekr-dash.service before running it.
+pytest>=9.0.0
