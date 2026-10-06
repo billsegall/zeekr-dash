@@ -12,6 +12,8 @@ plan
 zeekr_secrets.json
 zeekr_arm64.apk
 zeekr_base.apk
+# Any APK: they are 80-170MB each and must never be committed.
+*.apk
 .session.json
 
 # Byte-compiled / optimized / DLL files
