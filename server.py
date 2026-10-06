@@ -194,55 +194,49 @@ def fetch_travel_plan():
     return client.get_travel_plan(VIN)
 
 
-class _JourneyLogError(logging.Handler):
-    """Captures the API response that get_journey_log logs when a call is refused.
-
-    The library swallows a failed journey-log call into an empty dict and logs the
-    reason at DEBUG, so at the service's INFO level a refusal is indistinguishable
-    from "this vehicle has no trips" — the table just renders empty. Attaching this
-    handler for the duration of the call recovers the real code and message.
-    """
-
-    def __init__(self):
-        super().__init__(level=logging.DEBUG)
-        self.response: dict = {}
-
-    def emit(self, record):
-        # The library also logs bare dicts (request headers, response bodies), so
-        # record.msg is not always a string.
-        if not isinstance(record.msg, str) or not record.args:
-            return
-        if record.msg.startswith("Failed to get journey log"):
-            arg = record.args[0] if isinstance(record.args, tuple) else record.args
-            if isinstance(arg, dict):
-                self.response = arg
-
-
 @ttl_cache(300)
 def fetch_trips(size: int, days: int, end_time: int = 0):
-    capture = _JourneyLogError()
-    lib_log = client.logger
-    prev_level = lib_log.level
-    lib_log.addHandler(capture)
-    lib_log.setLevel(logging.DEBUG)
-    try:
-        data = client.get_journey_log(VIN, page_size=size, days_back=days, end_time=end_time)
-    finally:
-        lib_log.removeHandler(capture)
-        lib_log.setLevel(prev_level)
+    """Fetch the journey log, keeping the reason when the API refuses the call.
 
-    if data:
-        return data
+    client.get_journey_log() swallows a refusal into an empty dict and logs why at
+    DEBUG only, so at the service's INFO level a refusal looks identical to a
+    vehicle with no trips and the table just renders empty. The request is issued
+    here directly instead — the same pattern as the RCS control passthrough in
+    route_control — because raising the library logger to DEBUG to read that
+    message would also write the bearer token to the service log.
 
-    # Report the refusal in-band with HTTP 200: fetchAll() in the UI treats any
-    # non-ok trips response as a whole-dashboard failure, so a 500 here would also
-    # blank the status panel.
-    code = capture.response.get("code", "unknown")
-    msg = capture.response.get("msg") or "no detail returned by the API"
+    Body fields mirror get_journey_log: time-window pagination, where end_time is
+    the previous page's lastId - 1 and 0 means "now".
+    """
+    from zeekr_ev_api import network, const
+
+    headers = client.logged_in_headers.copy()
+    headers["X-VIN"] = client._get_encrypted_vin(VIN)
+    end_ms = end_time if end_time > 0 else int(time.time() * 1000)
+    body = {
+        "currentPage": 1,
+        "endTime": end_ms,
+        "lastId": -1,
+        "pageSize": size,
+        "startTime": end_ms - days * 86_400_000,
+    }
+    resp = network.appSignedPost(
+        client,
+        f"{client.region_login_server}{const.JOURNEY_LOG_URL}",
+        json.dumps(body, separators=(",", ":")),
+        extra_headers=headers,
+    )
+    if resp.get("success"):
+        return resp.get("data", {})
+
+    code = resp.get("code", "unknown")
+    msg = resp.get("msg") or "no detail returned by the API"
     log.warning("Trip log refused by Zeekr: %s %s", code, msg)
     # 079001 is the gateway's "interface not authorized" code, returned in Chinese.
     hint = (" — this endpoint is not authorized for these app credentials"
             if code == "079001" else "")
+    # Reported in-band with HTTP 200: fetchAll() treats any non-ok trips response as
+    # a whole-dashboard failure, so a 500 here would also blank the status panel.
     return {"error": f"Zeekr refused the trip log request ({code}): {msg}{hint}",
             "data": [], "total": 0, "pages": 0}
 
