@@ -232,3 +232,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Real user records: password hashes + per-user home coordinates.
+users.json

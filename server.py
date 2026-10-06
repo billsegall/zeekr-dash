@@ -33,6 +33,8 @@ from consts import (
 )
 from zeekr_ev_api import ZeekrClient
 from zeekr_ev_api.exceptions import AuthException, ZeekrException
+from notifier import build_notifier
+from monitor import CarMonitor
 
 load_dotenv()
 
@@ -195,6 +197,94 @@ def fetch_travel_plan():
 @ttl_cache(300)
 def fetch_trips(size: int, days: int, end_time: int = 0):
     return client.get_journey_log(VIN, page_size=size, days_back=days, end_time=end_time)
+
+
+# ---------------------------------------------------------------------------
+# Notifications / position monitor
+# ---------------------------------------------------------------------------
+#
+# Two-level config:
+#   - Per-user preferences (home base + event toggles) live in users.json and are
+#     edited via /api/prefs by each logged-in user (canonical source of truth).
+#   - .env holds deployment/transport config only: which user's prefs drive the
+#     single Signal channel (NOTIFY_USER_EMAIL), tuning constants, SIGNAL_*.
+# The poller reloads the notify-user's prefs each tick so UI edits apply live.
+
+PREF_DEFAULTS = {
+    "home_lat": None,
+    "home_lon": None,
+    "home_radius_km": 1.0,
+    "notify_movement": True,
+    "notify_arrive_home": True,
+    "notify_leave_home": False,
+}
+
+
+def _user_prefs(user: dict) -> dict:
+    return {k: user.get(k, default) for k, default in PREF_DEFAULTS.items()}
+
+
+def _save_user_prefs(uid: str, updates: dict) -> dict | None:
+    """Merge validated pref updates into a user record; returns the new prefs."""
+    users = _load_users()
+    user = next((u for u in users if u["id"] == uid), None)
+    if not user:
+        return None
+    for k in PREF_DEFAULTS:
+        if k in updates:
+            user[k] = updates[k]
+    _save_users(users)
+    return _user_prefs(user)
+
+
+notifier = build_notifier()
+monitor: CarMonitor | None = None
+if notifier is not None:
+    monitor = CarMonitor(
+        hysteresis_km=float(os.environ.get("HOME_HYSTERESIS_KM", "0.2") or 0.2),
+        move_threshold_m=float(os.environ.get("MOVE_THRESHOLD_M", "100") or 100),
+    )
+
+NOTIFY_USER_EMAIL = os.environ.get("NOTIFY_USER_EMAIL", "").strip().lower()
+
+# Floor poll interval at 30s: fetch_status() has a 30s TTL, so a shorter interval
+# would just re-read the same cached value. If you ever poll faster, switch the
+# poller to call client.get_vehicle_status(VIN) directly instead.
+POLL_INTERVAL = max(30, int(os.environ.get("POLL_INTERVAL", "60") or 60))
+
+_warned_no_notify_user = False
+
+
+def _poller_loop():
+    global _warned_no_notify_user
+    log.info("Position poller started (interval=%ds, notify_user=%s)", POLL_INTERVAL, NOTIFY_USER_EMAIL)
+    while True:
+        time.sleep(POLL_INTERVAL)
+        try:
+            user = _find_user_by_email(NOTIFY_USER_EMAIL)
+            if user:
+                p = _user_prefs(user)
+                monitor.update_config(
+                    home_lat=p["home_lat"], home_lon=p["home_lon"],
+                    radius_km=p["home_radius_km"] if p["home_lat"] is not None else None,
+                    notify_movement=p["notify_movement"],
+                    notify_arrive_home=p["notify_arrive_home"],
+                    notify_leave_home=p["notify_leave_home"],
+                )
+            elif not _warned_no_notify_user:
+                log.warning("NOTIFY_USER_EMAIL=%s not found; movement-only.", NOTIFY_USER_EMAIL)
+                _warned_no_notify_user = True
+            status = fetch_status()
+            for title, message in monitor.evaluate(status):
+                log.info("notify: %s — %s", title, message)
+                notifier.send(title, message)
+        except Exception as exc:
+            log.error("poller tick failed: %s", exc)
+
+
+if notifier is not None and monitor is not None:
+    from threading import Thread
+    Thread(target=_poller_loop, daemon=True, name="position-poller").start()
 
 
 # ---------------------------------------------------------------------------
@@ -680,6 +770,69 @@ def route_refresh():
         return jsonify({"ok": True, "vin": VIN})
     except Exception as e:
         return api_error(str(e))
+
+
+@app.get("/api/notify/test")
+@require_admin
+def route_notify_test():
+    """Send a test notification to verify the configured transport."""
+    if notifier is None:
+        return api_error("Notifier not configured", 400)
+    ok = notifier.send("Zeekr: test notification", "Notifications are wired up correctly.")
+    return jsonify({"ok": ok})
+
+
+@app.get("/api/prefs")
+@require_auth
+def route_get_prefs():
+    """Return the current user's notification preferences (home base + toggles)."""
+    uid = session.get("user_id")
+    if not uid:
+        return api_error("Login required for preferences", 401)
+    user = _find_user_by_id(uid)
+    if not user:
+        return api_error("Unauthorized", 401)
+    prefs = _user_prefs(user)
+    prefs["is_notify_user"] = (user["email"].lower() == NOTIFY_USER_EMAIL)
+    return jsonify(prefs)
+
+
+@app.put("/api/prefs")
+@require_auth
+def route_put_prefs():
+    """Update the current user's notification preferences."""
+    uid = session.get("user_id")
+    if not uid:
+        return api_error("Login required for preferences", 401)
+    data = request.get_json() or {}
+    updates: dict = {}
+    try:
+        if "home_lat" in data and "home_lon" in data:
+            if data["home_lat"] is None or data["home_lon"] is None:
+                updates["home_lat"] = None
+                updates["home_lon"] = None
+            else:
+                lat = float(data["home_lat"])
+                lon = float(data["home_lon"])
+                if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                    return api_error("Invalid coordinates", 400)
+                updates["home_lat"] = lat
+                updates["home_lon"] = lon
+        if "home_radius_km" in data:
+            r = float(data["home_radius_km"])
+            if not (0 < r <= 1000):
+                return api_error("Invalid radius", 400)
+            updates["home_radius_km"] = r
+        for key in ("notify_movement", "notify_arrive_home", "notify_leave_home"):
+            if key in data:
+                updates[key] = bool(data[key])
+    except (TypeError, ValueError):
+        return api_error("Invalid preference value", 400)
+
+    prefs = _save_user_prefs(uid, updates)
+    if prefs is None:
+        return api_error("Unauthorized", 401)
+    return jsonify(prefs)
 
 
 # ---------------------------------------------------------------------------

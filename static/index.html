@@ -477,6 +477,40 @@ body.read-only .ctrl-row { display: none !important; }
   </div>
 </div>
 
+<!-- Home base / notifications preferences -->
+<div id="homeModal" style="display:none;position:fixed;inset:0;background:rgba(7,12,24,.85);z-index:1500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div style="font-size:16px;font-weight:700">🏠 Home base & alerts</div>
+      <button class="refresh-btn" onclick="document.getElementById('homeModal').style.display='none'">✕ Close</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;font-size:13px">
+      <div>
+        <div style="color:var(--muted);margin-bottom:4px">Home base</div>
+        <div id="homeLabel" style="font-weight:600">Not set</div>
+        <div id="homeDistance" style="color:var(--muted);font-size:12px;margin-top:2px"></div>
+      </div>
+      <button class="refresh-btn" id="setHomeBtn" onclick="setHomeToCar()">📍 Set home to current car location</button>
+      <div>
+        <label style="color:var(--muted)">Radius (km)
+          <input id="homeRadius" class="ctrl-input" type="number" step="0.1" min="0.1" value="1.0" style="width:80px;margin-left:8px">
+        </label>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border);padding-top:12px">
+        <label><input type="checkbox" id="prefMovement"> Notify when car starts moving</label>
+        <label><input type="checkbox" id="prefArrive"> Notify when car arrives home</label>
+        <label><input type="checkbox" id="prefLeave"> Notify when car leaves home</label>
+      </div>
+      <div id="prefNotifyNote" style="color:var(--muted);font-size:11px"></div>
+      <div style="display:flex;gap:8px;align-items:center;border-top:1px solid var(--border);padding-top:12px">
+        <button class="refresh-btn" onclick="savePrefs()">💾 Save</button>
+        <button class="refresh-btn" id="testNotifyBtn" style="display:none" onclick="sendTestNotify()">🔔 Send test</button>
+        <span id="prefStatus" style="color:var(--muted);font-size:12px"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <header>
   <div class="header-left">
     <div class="status-dot" id="statusDot"></div>
@@ -576,6 +610,7 @@ body.read-only .ctrl-row { display: none !important; }
       <span class="icon">📍</span> Location
       <span style="margin-left:auto;font-size:10px;color:var(--muted)" id="mapAlt">—</span>
       <span style="font-size:10px;margin-left:12px" id="mapCoords">—</span>
+      <button class="refresh-btn" style="margin-left:12px;font-size:11px;padding:2px 8px" onclick="openHomeModal()">🏠 Home base</button>
     </div>
     <div id="map"></div>
   </div>
@@ -833,12 +868,14 @@ function hideLoginOverlay() {
 }
 
 function applyUserState(u) {
+  isAdmin = !!u.is_admin;
   document.getElementById('adminLink').style.display = u.is_admin ? 'inline' : 'none';
   if (u.can_write) {
     document.body.classList.remove('read-only');
   } else {
     document.body.classList.add('read-only');
   }
+  loadPrefs();
 }
 
 async function initSession() {
@@ -936,6 +973,8 @@ async function reverseGeocode(lat, lon) {
 async function updateMapPosition(lat, lng, alt) {
   if (!lat || !lng) return;
   const ll = [parseFloat(lat), parseFloat(lng)];
+  currentCarPos = { lat: ll[0], lng: ll[1] };
+  updateHomeDistance();
   const altM = parseInt(alt);
   document.getElementById('mapAlt').textContent = isNaN(altM) ? '' : altM + 'm';
   carMarker.setLatLng(ll).addTo(map);
@@ -947,6 +986,126 @@ async function updateMapPosition(lat, lng, alt) {
     const label = await reverseGeocode(ll[0], ll[1]);
     coordsEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${label}</a>`;
   } catch (_) {}
+}
+
+// --- Home base / notification preferences ---------------------------------
+let prefs = null;
+let currentCarPos = null;
+let homeMarker = null, homeCircle = null;
+let isAdmin = false;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371.0088, rad = d => d * Math.PI / 180;
+  const dlat = rad(lat2 - lat1), dlon = rad(lon2 - lon1);
+  const a = Math.sin(dlat / 2) ** 2 +
+            Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dlon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function loadPrefs() {
+  try {
+    const r = await fetch('/api/prefs', { credentials: 'same-origin' });
+    if (!r.ok) return;            // token/no-session users have no prefs
+    prefs = await r.json();
+    renderHomeOnMap();
+  } catch (_) {}
+}
+
+function renderHomeOnMap() {
+  if (!prefs || prefs.home_lat == null || prefs.home_lon == null) {
+    if (homeMarker) { map.removeLayer(homeMarker); homeMarker = null; }
+    if (homeCircle) { map.removeLayer(homeCircle); homeCircle = null; }
+    return;
+  }
+  const ll = [prefs.home_lat, prefs.home_lon];
+  const r = (prefs.home_radius_km || 1) * 1000;
+  if (!homeCircle) {
+    homeCircle = L.circle(ll, { radius: r, color: '#22c55e', weight: 1, fillOpacity: 0.08 }).addTo(map);
+    homeMarker = L.marker(ll, { icon: L.divIcon({
+      html: '<div style="font-size:18px;line-height:1">🏠</div>', className: '', iconAnchor: [9, 9] }) }).addTo(map);
+  } else {
+    homeCircle.setLatLng(ll).setRadius(r);
+    homeMarker.setLatLng(ll);
+  }
+}
+
+function updateHomeDistance() {
+  const el = document.getElementById('homeDistance');
+  const btn = document.getElementById('setHomeBtn');
+  if (!el) return;
+  if (!prefs || prefs.home_lat == null || !currentCarPos) { el.textContent = ''; return; }
+  const d = haversineKm(currentCarPos.lat, currentCarPos.lng, prefs.home_lat, prefs.home_lon);
+  el.textContent = `Car is ${d.toFixed(2)} km from home.`;
+  // Highlight the "set home" button when the car is meaningfully far from home.
+  if (btn) btn.style.borderColor = d > 1 ? '#22c55e' : '';
+}
+
+async function openHomeModal() {
+  if (!prefs) await loadPrefs();
+  if (!prefs) { alert('Sign in to set a home base.'); return; }
+  document.getElementById('testNotifyBtn').style.display = isAdmin ? 'inline-block' : 'none';
+  document.getElementById('prefNotifyNote').textContent = prefs.is_notify_user
+    ? 'Your home base drives the Signal notifications.'
+    : 'Note: notifications are driven by the designated notify-user, not this account.';
+  document.getElementById('homeRadius').value = prefs.home_radius_km ?? 1.0;
+  document.getElementById('prefMovement').checked = !!prefs.notify_movement;
+  document.getElementById('prefArrive').checked = !!prefs.notify_arrive_home;
+  document.getElementById('prefLeave').checked = !!prefs.notify_leave_home;
+  const label = document.getElementById('homeLabel');
+  if (prefs.home_lat == null) {
+    label.textContent = 'Not set';
+  } else {
+    label.textContent = `${prefs.home_lat.toFixed(5)}, ${prefs.home_lon.toFixed(5)}`;
+    try { label.textContent = await reverseGeocode(prefs.home_lat, prefs.home_lon); } catch (_) {}
+  }
+  updateHomeDistance();
+  document.getElementById('prefStatus').textContent = '';
+  document.getElementById('homeModal').style.display = 'flex';
+}
+
+function setHomeToCar() {
+  if (!currentCarPos) { alert('No current car position yet — refresh first.'); return; }
+  prefs.home_lat = currentCarPos.lat;
+  prefs.home_lon = currentCarPos.lng;
+  document.getElementById('homeLabel').textContent =
+    `${prefs.home_lat.toFixed(5)}, ${prefs.home_lon.toFixed(5)}`;
+  reverseGeocode(prefs.home_lat, prefs.home_lon)
+    .then(l => { document.getElementById('homeLabel').textContent = l; }).catch(() => {});
+  document.getElementById('prefStatus').textContent = 'Unsaved — click Save.';
+}
+
+async function savePrefs() {
+  const body = {
+    home_lat: prefs ? prefs.home_lat : null,
+    home_lon: prefs ? prefs.home_lon : null,
+    home_radius_km: parseFloat(document.getElementById('homeRadius').value) || 1.0,
+    notify_movement: document.getElementById('prefMovement').checked,
+    notify_arrive_home: document.getElementById('prefArrive').checked,
+    notify_leave_home: document.getElementById('prefLeave').checked,
+  };
+  const st = document.getElementById('prefStatus');
+  st.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/prefs', {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!r.ok) { st.textContent = 'Save failed.'; return; }
+    prefs = await r.json();
+    renderHomeOnMap();
+    updateHomeDistance();
+    st.textContent = 'Saved.';
+  } catch (e) { st.textContent = 'Save error.'; }
+}
+
+async function sendTestNotify() {
+  const st = document.getElementById('prefStatus');
+  st.textContent = 'Sending…';
+  try {
+    const r = await fetch('/api/notify/test', { credentials: 'same-origin' });
+    const d = await r.json();
+    st.textContent = r.ok && d.ok ? 'Test sent.' : ('Failed: ' + (d.error || 'send error'));
+  } catch (e) { st.textContent = 'Send error.'; }
 }
 
 function showTripOnMap(trackPoints) {

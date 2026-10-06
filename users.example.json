@@ -1,0 +1,17 @@
+{
+  "users": [
+    {
+      "id": "replace-with-random-hex",
+      "email": "your@email.com",
+      "password_hash": "scrypt:32768:8:1$...  (generate with werkzeug.security.generate_password_hash)",
+      "is_admin": true,
+      "can_write": true,
+      "home_lat": null,
+      "home_lon": null,
+      "home_radius_km": 1.0,
+      "notify_movement": true,
+      "notify_arrive_home": true,
+      "notify_leave_home": false
+    }
+  ]
+}
