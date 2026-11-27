@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any
+from typing import Any, Callable
 
 log = logging.getLogger(__name__)
 
@@ -56,9 +56,18 @@ class CarMonitor:
     likewise re-baselines the geofence silently.
     """
 
-    def __init__(self, *, hysteresis_km: float = 0.2, move_threshold_m: float = 100.0):
+    def __init__(
+        self,
+        *,
+        hysteresis_km: float = 0.2,
+        move_threshold_m: float = 100.0,
+        locate: Callable[[float, float], str | None] | None = None,
+    ):
         self.hysteresis_km = hysteresis_km
         self.move_threshold_m = move_threshold_m
+        # Optional (lat, lon) -> place name lookup (e.g. reverse-geocoded suburb).
+        # Injected so this module stays I/O-free; None => raw coordinates.
+        self.locate = locate
 
         # Dynamic config (set via update_config). No home => geofence disabled.
         self.home_lat: float | None = None
@@ -192,9 +201,8 @@ class CarMonitor:
         if is_moving and not self.moving:
             if self.notify_movement:
                 events.append((
-                    "Zeekr: car started moving",
-                    f"Now at {lat:.5f}, {lon:.5f}"
-                    + (f" ({speed:.0f} km/h)" if speed > 0 else ""),
+                    f"Zeekr: car started moving from {self._describe_start(lat, lon)}",
+                    f"{speed:.0f} km/h" if speed > 0 else "",
                 ))
             self.moving = True
         elif self.moving and speed == 0 and not fresh:
@@ -227,6 +235,26 @@ class CarMonitor:
 
         self._remember(lat, lon, update_time)
         return events
+
+    def _describe_start(self, lat: float, lon: float) -> str:
+        """Where the car pulled away from: home, a suburb, or coordinates.
+
+        Uses the last parked position (before this tick's movement) when known,
+        and the geofence state, which still reflects that position here.
+        """
+        if self.has_home() and self.inside_home:
+            return "home"
+        if self.last_lat is not None and self.last_lon is not None:
+            lat, lon = self.last_lat, self.last_lon
+        if self.locate is not None:
+            try:
+                place = self.locate(lat, lon)
+            except Exception as exc:  # a lookup failure must never drop the alert
+                log.warning("monitor: locate failed: %s", exc)
+                place = None
+            if place:
+                return place
+        return f"{lat:.5f}, {lon:.5f}"
 
     def _remember(self, lat: float, lon: float, update_time: int | None) -> None:
         self.last_lat = lat

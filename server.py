@@ -35,6 +35,7 @@ from consts import (
 from zeekr_ev_api import ZeekrClient
 from zeekr_ev_api.exceptions import AuthException, ZeekrException
 from notifier import build_notifier
+from geocode import suburb_for
 from monitor import CarMonitor
 
 load_dotenv()
@@ -286,6 +287,7 @@ if notifier is not None:
     monitor = CarMonitor(
         hysteresis_km=float(os.environ.get("HOME_HYSTERESIS_KM", "0.2") or 0.2),
         move_threshold_m=float(os.environ.get("MOVE_THRESHOLD_M", "100") or 100),
+        locate=suburb_for,
     )
 
 NOTIFY_USER_EMAIL = os.environ.get("NOTIFY_USER_EMAIL", "").strip().lower()

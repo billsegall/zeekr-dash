@@ -174,3 +174,48 @@ if __name__ == "__main__":
             print(f"FAIL {f.__name__}: {exc}")
     print(f"\n{len(funcs) - failed}/{len(funcs)} passed")
     sys.exit(1 if failed else 0)
+
+
+# --- movement message: where it started from ------------------------------
+
+def _start_title(m, at=(-27.5, 153.0)):
+    m.evaluate(_status(*at, speed=0, t=1))                        # baseline parked
+    e = m.evaluate(_status(at[0] + 0.01, at[1], speed=30, engine="engine-on", t=2))
+    titles = [t for t, _ in e if "started moving" in t]
+    assert len(titles) == 1, e
+    return titles[0], e
+
+
+def test_start_from_home_says_home_only():
+    calls = []
+    m = _monitor(home=(-27.5, 153.0), radius=1.0)
+    m.locate = lambda lat, lon: calls.append((lat, lon)) or "Somewhere"
+    title, e = _start_title(m, at=(-27.5, 153.0))
+    assert title == "Zeekr: car started moving from home", title
+    assert calls == []                                   # no lookup needed at home
+    assert all("-27." not in t + b for t, b in e), e     # no coordinates
+
+
+def test_start_away_uses_suburb_of_parked_spot():
+    calls = []
+    m = _monitor(home=(-27.5, 153.0), radius=1.0)
+    m.locate = lambda lat, lon: calls.append((lat, lon)) or "Paddington"
+    title, _ = _start_title(m, at=(-28.0, 153.0))
+    assert title == "Zeekr: car started moving from Paddington", title
+    assert calls == [(-28.0, 153.0)]                     # parked position, not current
+
+
+def test_start_falls_back_to_coords_when_lookup_fails():
+    m = _monitor(home=None)
+    m.locate = lambda lat, lon: None
+    title, _ = _start_title(m, at=(-28.0, 153.0))
+    assert title == "Zeekr: car started moving from -28.00000, 153.00000", title
+
+
+def test_start_lookup_exception_does_not_drop_alert():
+    def boom(lat, lon):
+        raise RuntimeError("network down")
+    m = _monitor(home=None)
+    m.locate = boom
+    title, _ = _start_title(m, at=(-28.0, 153.0))
+    assert title.endswith("-28.00000, 153.00000"), title
