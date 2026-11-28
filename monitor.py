@@ -227,10 +227,7 @@ class CarMonitor:
             else:
                 if dist <= self.radius_km:
                     if self.notify_arrive_home:
-                        events.append((
-                            "Zeekr: car arrived home",
-                            f"Within {dist:.2f} km of home base",
-                        ))
+                        events.append(("Zeekr: car arrived home", ""))
                     self.inside_home = True
 
         self._remember(lat, lon, update_time)

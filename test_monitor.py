@@ -67,8 +67,7 @@ def test_arrive_home_fires_once():
     m.evaluate(_status(-28.0, 153.0, t=1))            # baseline: outside
     e1 = m.evaluate(_status(-27.5, 153.0, t=2))       # inside -> arrive
     e2 = m.evaluate(_status(-27.5005, 153.0, t=3))    # still inside -> nothing
-    titles1 = [t for t, _ in e1]
-    assert any("arrived home" in t for t in titles1), e1
+    assert ("Zeekr: car arrived home", "") in e1, e1     # just "arrived home", no distance
     assert all("arrived" not in t for t, _ in e2), e2
 
 
